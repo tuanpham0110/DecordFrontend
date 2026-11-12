@@ -1,0 +1,352 @@
+/* ═══════════ Auth – frog hugging the form (from the design PDF) ═══════════ */
+.auth2 {
+    position: relative;
+    min-height: 100vh;
+    overflow: hidden;
+    background: linear-gradient(180deg, #7cc4f1 0%, #9ad3f6 45%, #b9e2f8 100%);
+    isolation: isolate;
+}
+.auth2__top {
+    position: relative;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--s-5) var(--s-8);
+}
+.auth2__top .logo--light span {
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.auth2__home {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: var(--r-pill);
+    background: rgba(255, 255, 255, 0.28);
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 500;
+    backdrop-filter: blur(6px);
+    transition: background-color var(--dur);
+}
+.auth2__home:hover {
+    background: rgba(255, 255, 255, 0.42);
+}
+.auth2__main {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    justify-items: center;
+    padding: 0 var(--s-3);
+}
+.auth2__greet {
+    margin: -36px 0 4px;
+    text-align: center;
+    color: #fff;
+}
+.auth2__greet h2 {
+    color: #fff;
+    font-size: clamp(2.2rem, 1.2rem + 3.4vh, 3.4rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    text-shadow: 0 2px 12px rgba(30, 90, 140, 0.18);
+}
+.auth2__greet p {
+    margin-top: 6px;
+    font-family: var(--font-display);
+    font-size: clamp(1rem, 0.85rem + 0.6vw, 1.4rem);
+    color: rgba(255, 255, 255, 0.95);
+}
+
+/* ── Frog ── */
+.frog-stage {
+    position: relative;
+    width: min(500px, 100%, 58vh);
+    container-type: inline-size;
+    padding-bottom: var(--s-6);
+}
+.frog-head {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: 100%;
+    height: auto;
+}
+.frog-body {
+    position: absolute;
+    z-index: 1;
+    top: 32cqw;
+    left: -13cqw;
+    right: -13cqw;
+    bottom: -60vh;
+    background: #bfe063;
+    border: 7px solid #1f3a1c;
+    border-radius: 50% 50% 0 0 / 30cqw 30cqw 0 0;
+}
+.frog-sparks {
+    position: absolute;
+    z-index: 2;
+    top: 6cqw;
+    left: -2cqw;
+    width: 14cqw;
+    height: 14cqw;
+}
+.frog-sparks i {
+    position: absolute;
+    width: 3.2cqw;
+    height: 7cqw;
+    border-radius: 99px;
+    background: #f4a51c;
+}
+.frog-sparks i:nth-child(1) {
+    left: 0;
+    top: 6cqw;
+    transform: rotate(-70deg);
+}
+.frog-sparks i:nth-child(2) {
+    left: 4cqw;
+    top: 0;
+    transform: rotate(-35deg);
+}
+.frog-sparks i:nth-child(3) {
+    left: 9cqw;
+    top: -2cqw;
+    transform: rotate(-8deg);
+}
+
+.frog-card {
+    position: relative;
+    z-index: 3;
+    margin: -10cqw 5cqw 0;
+    padding: 10cqw 8cqw 7cqw;
+    border-radius: 46cqw 46cqw 44px 44px / 15cqw 15cqw 44px 44px;
+    background: #fcfdf7;
+    box-shadow: inset 0 0 0 6px #fff, inset 0 0 0 7px #e4eccf, 0 18px 40px -26px rgba(31, 58, 28, 0.6);
+}
+.frog-card .auth__card {
+    max-width: none;
+}
+.frog-hand {
+    position: absolute;
+    z-index: 4;
+    top: -3.5cqw;
+    width: 21cqw;
+    height: auto;
+    filter: drop-shadow(0 3px 0 rgba(31, 58, 28, 0.12));
+}
+.frog-hand--left {
+    left: -7cqw;
+    transform: rotate(-12deg);
+}
+.frog-hand--right {
+    right: -7cqw;
+    transform: scaleX(-1) rotate(-12deg);
+}
+
+/* inner auth content adapts to the centered card */
+.auth2 .auth-head {
+    margin-bottom: var(--s-6);
+    text-align: center;
+}
+.auth2 .auth-head h1 {
+    font-size: clamp(1.6rem, 1.3rem + 1vw, 2rem);
+    font-weight: 700;
+    color: #183b1e;
+}
+.auth2 .auth-head p {
+    margin-top: 4px;
+}
+.auth2 .field__control {
+    height: 50px;
+    background: #f7f8f2;
+    border-color: #dcdccf;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.auth2 .field__control:focus-within {
+    background: #fff;
+}
+.auth2 .auth-form .btn--lg {
+    height: 54px;
+    font-size: var(--text-md);
+    box-shadow: 0 6px 0 -2px #b9470b;
+}
+.auth2 .auth-form .btn--lg:active {
+    box-shadow: 0 3px 0 -2px #b9470b;
+}
+.auth2 .auth-foot {
+    margin-top: var(--s-5);
+}
+.auth2 .auth-back {
+    margin-bottom: var(--s-4);
+}
+
+/* ── Scenery ── */
+.auth2__scenery {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+.sky-cloud {
+    position: absolute;
+    width: 200px;
+    opacity: 0.95;
+}
+.sky-cloud--1 {
+    top: 22%;
+    left: 6%;
+    width: 220px;
+}
+.sky-cloud--2 {
+    top: 12%;
+    right: 7%;
+    width: 170px;
+}
+.sky-cloud--3 {
+    top: 46%;
+    right: 12%;
+    width: 130px;
+    opacity: 0.8;
+}
+.bush {
+    position: absolute;
+    bottom: -6px;
+    width: 300px;
+    z-index: 4;
+}
+.bush--left {
+    left: -30px;
+}
+.bush--right {
+    right: -30px;
+    transform: scaleX(-1);
+}
+
+@media (max-width: 1000px) {
+    .auth2__scenery {
+        z-index: 0;
+    }
+    .bush {
+        width: 200px;
+        z-index: 0;
+    }
+    .sky-cloud--3 {
+        display: none;
+    }
+}
+@media (max-width: 560px) {
+    .auth2__top {
+        padding: var(--s-4);
+    }
+    .auth2__greet {
+        margin-top: 0;
+    }
+    .frog-stage {
+        padding-bottom: var(--s-8);
+    }
+    .frog-card {
+        margin-inline: 2cqw;
+        padding: 12cqw 6cqw 8cqw;
+    }
+    .frog-hand {
+        width: 24cqw;
+        top: -5cqw;
+    }
+    .frog-hand--left {
+        left: -5cqw;
+    }
+    .frog-hand--right {
+        right: -5cqw;
+    }
+    .sky-cloud--1 {
+        top: 14%;
+        left: -40px;
+        width: 150px;
+    }
+    .sky-cloud--2 {
+        top: 9%;
+        right: -30px;
+        width: 120px;
+    }
+    .bush {
+        display: none;
+    }
+    .auth2 .auth-social {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* No visible scrollbar on auth screens (content still scrolls on very short screens) */
+html.no-scrollbar {
+    scrollbar-width: none;
+}
+html.no-scrollbar::-webkit-scrollbar,
+html.no-scrollbar body::-webkit-scrollbar {
+    display: none;
+}
+html.no-scrollbar body {
+    scrollbar-width: none;
+}
+
+/* Compact form on shorter viewports so it fits without scrolling */
+@media (max-height: 920px) and (min-width: 561px) {
+    .auth2__top {
+        padding-block: var(--s-4);
+    }
+    .auth2__greet p {
+        margin-top: 0;
+    }
+    .frog-card {
+        padding-top: 8cqw;
+        padding-bottom: 5cqw;
+    }
+    .auth2 .auth-head {
+        margin-bottom: var(--s-4);
+    }
+    .auth2 .auth-form {
+        gap: var(--s-3);
+    }
+    .auth2 .field__control {
+        height: 44px;
+    }
+    .auth2 .auth-form .btn--lg {
+        height: 48px;
+    }
+    .auth2 .auth-social .btn {
+        height: 40px;
+    }
+    .auth2 .divider {
+        margin-block: 0;
+    }
+    .auth2 .auth-foot {
+        margin-top: var(--s-3);
+    }
+    .auth2 .auth-demo {
+        display: none;
+    }
+}
+
+@media (max-height: 800px) and (min-width: 561px) {
+    .auth2__greet h2 {
+        font-size: 2.1rem;
+    }
+    .auth2__greet p {
+        font-size: 0.95rem;
+    }
+    .frog-stage {
+        width: min(500px, 100%, 54vh);
+        padding-bottom: var(--s-3);
+    }
+    .auth2 .auth-head h1 {
+        font-size: 1.5rem;
+    }
+    .auth2 .auth-head p {
+        display: none;
+    }
+    .auth2 .field__hint {
+        display: none;
+    }
+}

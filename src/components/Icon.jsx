@@ -129,7 +129,6 @@ const paths = {
             <path d="M10 12h10M16.5 8.5 20 12l-3.5 3.5" />
         </>
     ),
-    play: <path d="M8 5.5v13l10.5-6.5z" />,
     volume: (
         <>
             <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
@@ -155,7 +154,6 @@ const paths = {
             <path d="M8.5 11V8.5a3.5 3.5 0 0 1 7 0V11" />
         </>
     ),
-    bookmark: <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1z" />,
     shuffle: (
         <>
             <path d="M4 7h3.5c4.5 0 4.5 10 9 10H20M4 17h3.5c1.6 0 2.6-1.2 3.4-2.8M13.1 9.8c.8-1.6 1.8-2.8 3.4-2.8H20" />
@@ -172,6 +170,118 @@ const paths = {
         <>
             <path d="M5 21V4" />
             <path d="M5 4.5h11l-2 4 2 4H5" />
+        </>
+    ),
+    headphones: (
+        <>
+            <path d="M4 15v-3a8 8 0 0 1 16 0v3" />
+            <rect x="3.5" y="14" width="4" height="6" rx="1.5" />
+            <rect x="16.5" y="14" width="4" height="6" rx="1.5" />
+        </>
+    ),
+    puzzle: (
+        <>
+            <path d="M5 8h3.2a2 2 0 1 1 3.6 0H15v3.2a2 2 0 1 1 0 3.6V18h-3.2a2 2 0 1 0-3.6 0H5v-3.2a2 2 0 1 0 0-3.6z" />
+        </>
+    ),
+    mic: (
+        <>
+            <rect x="9" y="3" width="6" height="11" rx="3" />
+            <path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7" />
+        </>
+    ),
+    play: (
+        <>
+            <path d="M8 5.5v13a.8.8 0 0 0 1.2.7l10.3-6.5a.8.8 0 0 0 0-1.4L9.2 4.8A.8.8 0 0 0 8 5.5z" fill="currentColor" />
+        </>
+    ),
+    pause: (
+        <>
+            <rect x="6.5" y="5" width="3.6" height="14" rx="1" fill="currentColor" />
+            <rect x="13.9" y="5" width="3.6" height="14" rx="1" fill="currentColor" />
+        </>
+    ),
+    stop: (
+        <>
+            <rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor" />
+        </>
+    ),
+    undo: (
+        <>
+            <path d="M9 14 4 9l5-5" />
+            <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+        </>
+    ),
+    bookmark: (
+        <>
+            <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" />
+        </>
+    ),
+    'bookmark-filled': (
+        <>
+            <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z" fill="currentColor" />
+        </>
+    ),
+    heart: (
+        <>
+            <path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z" />
+        </>
+    ),
+    'heart-filled': (
+        <>
+            <path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.2a4.3 4.3 0 0 1 7.5 2.6C19.5 15.4 12 20 12 20z" fill="currentColor" />
+        </>
+    ),
+    bulb: (
+        <>
+            <path d="M9 18h6M10 21h4" />
+            <path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.2h5c0-.9.4-1.7 1.1-2.2A6 6 0 0 0 12 3z" />
+        </>
+    ),
+    trash: (
+        <>
+            <path d="M4 7h16M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13" />
+        </>
+    ),
+    keyboard: (
+        <>
+            <rect x="2.5" y="6" width="19" height="12" rx="2" />
+            <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+        </>
+    ),
+    calendar: (
+        <>
+            <rect x="3.5" y="5" width="17" height="15.5" rx="2" />
+            <path d="M3.5 10h17M8 3v4M16 3v4" />
+        </>
+    ),
+    layers: (
+        <>
+            <path d="m12 3 9 5-9 5-9-5z" />
+            <path d="m3 13 9 5 9-5" />
+        </>
+    ),
+    info: (
+        <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v5.5M12 7.6v.01" />
+        </>
+    ),
+    'x-circle': (
+        <>
+            <circle cx="12" cy="12" r="9" />
+            <path d="m9 9 6 6m0-6-6 6" />
+        </>
+    ),
+    gauge: (
+        <>
+            <path d="M4.5 17a8.5 8.5 0 1 1 15 0" />
+            <path d="m12 13 3.5-4" />
+        </>
+    ),
+    sparkle: (
+        <>
+            <path d="M12 3.5 13.8 10l6.7 2-6.7 2L12 20.5 10.2 14 3.5 12l6.7-2z" />
         </>
     ),
 };

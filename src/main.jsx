@@ -11,6 +11,10 @@ import './styles/components.css';
 import './styles/layout.css';
 import './styles/landing.css';
 import './styles/pages.css';
+import './styles/landing-v2.css';
+import './styles/app.css';
+import './styles/learn.css';
+import './styles/auth.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>

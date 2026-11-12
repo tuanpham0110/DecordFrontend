@@ -50,8 +50,11 @@
     --danger-bg: #fdebe7;
 
     /* Typography */
-    --font-display: 'Lexend', system-ui, sans-serif;
-    --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+    /* System UI stack – the same family Facebook / Zalo render with
+       (Segoe UI on Windows, San Francisco on Apple, Roboto on Android). */
+    --font-system: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Helvetica, Arial, 'Noto Sans', sans-serif;
+    --font-display: var(--font-system);
+    --font-body: var(--font-system);
 
     --text-xs: 0.75rem;
     --text-sm: 0.875rem;
@@ -94,5 +97,5 @@
 
     --header-h: 72px;
     --sidebar-w: 248px;
-    --container: 1200px;
+    --container: 1320px;
 }

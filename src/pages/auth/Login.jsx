@@ -54,6 +54,13 @@ export default function Login() {
                 <p>Tiếp tục hành trình học tiếng Mường của bạn.</p>
             </div>
             <form className="auth-form" onSubmit={onSubmit} noValidate>
+                {location.state?.from && !formError && (
+                    <FormAlert tone="info">
+                        {location.state.verified
+                            ? 'Tài khoản đã được xác thực. Đăng nhập để tiếp tục nơi bạn đang xem.'
+                            : 'Nội dung này dành cho thành viên. Hãy đăng nhập hoặc tạo tài khoản miễn phí – bạn sẽ quay lại đúng trang đang xem.'}
+                    </FormAlert>
+                )}
                 <FormAlert>{formError}</FormAlert>
                 <TextField
                     label="Email"
@@ -90,7 +97,7 @@ export default function Login() {
             </form>
             <p className="auth-foot">
                 Chưa có tài khoản?{' '}
-                <Link to="/dang-ky" className="link">
+                <Link to="/dang-ky" state={{ from: location.state?.from }} className="link">
                     Đăng ký ngay
                 </Link>
             </p>

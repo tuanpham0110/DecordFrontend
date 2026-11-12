@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { review } from '../services/api.js';
 import Icon from '../components/Icon.jsx';
 import { Logo } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -56,9 +57,18 @@ function UserMenu() {
 
 export default function AppLayout() {
     const [open, setOpen] = useState(false);
+    const [due, setDue] = useState(0);
     const location = useLocation();
     useEffect(() => {
         setOpen(false);
+        let alive = true;
+        review
+            .queue({ scope: 'due' })
+            .then((q) => alive && setDue(q.length))
+            .catch(() => {});
+        return () => {
+            alive = false;
+        };
     }, [location.pathname]);
 
     return (
@@ -95,10 +105,15 @@ export default function AppLayout() {
                         <Logo to="/tong-quan" compact />
                     </div>
                     <div className="topbar__right">
-                        <button className="icon-btn" aria-label="Thông báo">
+                        <Link
+                            to="/on-luyen"
+                            className="icon-btn"
+                            aria-label={due ? `${due} câu đến hạn ôn tập` : 'Không có câu nào cần ôn'}
+                            title={due ? `${due} câu đến hạn ôn tập` : 'Không có câu nào cần ôn'}
+                        >
                             <Icon name="bell" size={20} />
-                            <span className="icon-btn__dot" />
-                        </button>
+                            {due > 0 && <span className="icon-btn__count">{due > 9 ? '9+' : due}</span>}
+                        </Link>
                         <UserMenu />
                     </div>
                 </header>

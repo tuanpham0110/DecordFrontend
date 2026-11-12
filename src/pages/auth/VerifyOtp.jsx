@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui.jsx';
 import Icon from '../../components/Icon.jsx';
 import { auth, DEMO_OTP } from '../../services/api.js';
@@ -60,6 +60,7 @@ function OtpInput({ value, onChange, invalid, disabled }) {
 
 export default function VerifyOtp() {
     const navigate = useNavigate();
+    const location = useLocation();
     const toast = useToast();
     const [pending] = useState(() => auth.pending());
     const [code, setCode] = useState('');
@@ -89,7 +90,7 @@ export default function VerifyOtp() {
             if (isReset) navigate('/dat-lai-mat-khau', { replace: true });
             else {
                 toast('Xác thực thành công. Mời bạn đăng nhập.');
-                navigate('/dang-nhap', { replace: true });
+                navigate('/dang-nhap', { replace: true, state: { from: location.state?.from, verified: true } });
             }
         } catch (err) {
             setError(err.message);

@@ -35,6 +35,6 @@ export function RequireAuth({ children }) {
     const { user, signedOut } = useAuth();
     const location = useLocation();
     if (!user && signedOut) return <Navigate to="/" replace />;
-    if (!user) return <Navigate to="/dang-nhap" replace state={{ from: location.pathname }} />;
+    if (!user) return <Navigate to="/dang-nhap" replace state={{ from: location.pathname + location.search }} />;
     return children;
 }

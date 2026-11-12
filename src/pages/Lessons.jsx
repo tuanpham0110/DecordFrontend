@@ -1,18 +1,20 @@
 import { Link } from 'react-router-dom';
 import { Button, ErrorState, Progress, Ring, Skeleton } from '../components/ui.jsx';
+import Icon from '../components/Icon.jsx';
 import { learning } from '../services/api.js';
 import useAsync from '../hooks/useAsync.js';
 
 const ACTION = {
-    done: { label: 'Ôn lại', variant: 'green' },
-    active: { label: 'Tiếp tục học', variant: 'clay' },
-    locked: { label: 'Xem chặng', variant: 'outline' },
+    done: 'Ôn lại',
+    active: 'Tiếp tục học',
+    locked: 'Xem chặng',
+    soon: 'Xem chặng',
 };
 
 function stageCta(s) {
     if (s.status === 'done') return { text: `Ôn lại chặng ${s.id}`, variant: 'green' };
     if (s.status === 'active') return { text: `Tiếp tục chặng ${s.id}`, variant: 'clay' };
-    return { text: `Khám phá chặng ${s.id}`, variant: 'outline-river' };
+    return { text: `Khám phá chặng ${s.id}`, variant: 'outline' };
 }
 
 export default function Lessons() {
@@ -25,13 +27,13 @@ export default function Lessons() {
                 <img className="journey__bg" src="/assets/journey-landscape.webp" alt="" />
                 <div className="journey__head">
                     <h1>Hành trình học tiếng Mường</h1>
-                    <p>Đi qua 3 chặng, khám phá 14 bài học</p>
+                    <p>{data ? `Đi qua ${data.stages.length} chặng, khám phá ${data.total} bài học` : ' '}</p>
                 </div>
                 <img className="journey__path" src="/assets/journey-path.webp" alt="" />
                 <img className="journey__mascot" src="/assets/mascot-point.webp" alt="" />
 
                 <ol className="journey__stops">
-                    {(data?.stages ?? [1, 2, 3].map((id) => ({ id, placeholder: true }))).map((s) =>
+                    {(data?.stages.slice(0, 3) ?? [1, 2, 3].map((id) => ({ id, placeholder: true }))).map((s) =>
                         s.placeholder ? (
                             <li key={s.id} className={`stop stop--${s.id}`}>
                                 <Skeleton h={130} r={16} />
@@ -40,7 +42,9 @@ export default function Lessons() {
                             <li key={s.id} className={`stop stop--${s.id} stop--${s.tone}`}>
                                 <span className="stop__label">Chặng {s.id}</span>
                                 <strong className="stop__title">{s.title}</strong>
-                                <span className="stop__meta">{s.total} bài học</span>
+                                <span className="stop__meta">
+                                    {s.status === 'soon' ? `${s.total} bài · đang biên soạn` : `${s.completed}/${s.total} bài hoàn thành`}
+                                </span>
                                 <Button to={`/bai-hoc/chang/${s.id}`} size="sm" variant={stageCta(s).variant} iconRight="arrow-right">
                                     {stageCta(s).text}
                                 </Button>
@@ -49,6 +53,23 @@ export default function Lessons() {
                     )}
                 </ol>
             </section>
+
+            {data?.resume || data?.current ? (
+                <Link to={`/hoc/${data.resume?.lessonId ?? data.current.lesson.id}`} className="resume-strip">
+                    <span className="resume-strip__icon">
+                        <Icon name="play" size={18} />
+                    </span>
+                    <span className="resume-strip__text">
+                        <small>{data.resume ? `Đang dừng ở câu ${data.resume.done + 1}/${data.resume.total} · ${data.resume.part}` : 'Bài tiếp theo'}</small>
+                        <strong>
+                            Bài {data.resume ? data.resume.lessonId : data.current.lesson.id}: {data.resume ? data.resume.title : data.current.lesson.title}
+                        </strong>
+                    </span>
+                    <span className="resume-strip__cta">
+                        {data.resume ? 'Học tiếp' : 'Bắt đầu'} <Icon name="arrow-right" size={16} />
+                    </span>
+                </Link>
+            ) : null}
 
             {/* Overview */}
             {error ? (
@@ -84,7 +105,7 @@ export default function Lessons() {
                                                 <Progress value={s.percent} tone={s.tone} label={`Tiến độ chặng ${s.id}`} />
                                                 <span className="srow__pct">{s.percent}%</span>
                                                 <Link to={`/bai-hoc/chang/${s.id}`} className="link srow__link">
-                                                    {ACTION[s.status].label}
+                                                    {ACTION[s.status]}
                                                 </Link>
                                             </div>
                                         </div>

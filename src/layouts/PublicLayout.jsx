@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Button, Logo } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -61,10 +61,37 @@ export default function PublicLayout() {
             </header>
             <Outlet />
             <footer className="site-footer">
-                <div className="container site-footer__inner">
-                    <Logo />
-                    <p>Nền tảng học tập và tra cứu tiếng Mường cho đội ngũ công chức trẻ.</p>
-                    <p className="site-footer__copy">© {new Date().getFullYear()} MUONGLAB</p>
+                <div className="container site-footer__grid">
+                    <div className="site-footer__brand">
+                        <Logo />
+                        <p>Nền tảng học tập và tra cứu tiếng Mường cho đội ngũ công chức trẻ. Mỗi ngày 5 phút, giao tiếp được ngay.</p>
+                    </div>
+                    <nav aria-label="Học tập">
+                        <h4>Học tập</h4>
+                        <Link to="/hoc-thu">Học thử 5 phút</Link>
+                        <Link to="/bai-hoc">Hành trình học</Link>
+                        <Link to="/on-luyen">Ôn luyện</Link>
+                    </nav>
+                    <nav aria-label="Tra cứu">
+                        <h4>Tra cứu</h4>
+                        <Link to="/so-tay">Sổ tay</Link>
+                        <Link to="/cam-nang">Cẩm nang</Link>
+                    </nav>
+                    <nav aria-label="Tài khoản">
+                        <h4>Tài khoản</h4>
+                        {user ? (
+                            <Link to="/tong-quan">Trang học của tôi</Link>
+                        ) : (
+                            <>
+                                <Link to="/dang-nhap">Đăng nhập</Link>
+                                <Link to="/dang-ky">Đăng ký</Link>
+                            </>
+                        )}
+                    </nav>
+                </div>
+                <div className="container site-footer__bottom">
+                    <span>© {new Date().getFullYear()} MUONGLAB</span>
+                    <span>Nội dung tiếng Mường được đội ngũ chuyên môn biên soạn và kiểm chứng trước khi đăng.</span>
                 </div>
             </footer>
         </>

@@ -16,6 +16,8 @@ import Lessons from './pages/Lessons.jsx';
 import Stage from './pages/Stage.jsx';
 import Lesson from './pages/Lesson.jsx';
 import Practice from './pages/Practice.jsx';
+import LessonPlayer from './pages/LessonPlayer.jsx';
+import ReviewSession from './pages/ReviewSession.jsx';
 import Notebook from './pages/Notebook.jsx';
 import Handbook from './pages/Handbook.jsx';
 import NotFound from './pages/NotFound.jsx';
@@ -41,8 +43,26 @@ export default function App() {
             <Routes>
                 <Route element={<PublicLayout />}>
                     <Route index element={<Landing />} />
-                    <Route path="hoc-thu" element={<Practice trial />} />
                 </Route>
+
+                {/* Focus layouts – no site chrome while learning */}
+                <Route path="hoc-thu" element={<LessonPlayer trial />} />
+                <Route
+                    path="hoc/:lessonId"
+                    element={
+                        <RequireAuth>
+                            <LessonPlayer />
+                        </RequireAuth>
+                    }
+                />
+                <Route
+                    path="on-luyen/phien"
+                    element={
+                        <RequireAuth>
+                            <ReviewSession />
+                        </RequireAuth>
+                    }
+                />
 
                 <Route
                     element={

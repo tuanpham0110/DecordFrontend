@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Checkbox, TextField } from '../../components/ui.jsx';
 import { auth } from '../../services/api.js';
 import { FormAlert, SocialLogin, isEmail, validatePassword } from './shared.jsx';
 
 export default function Register() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', agree: false });
     const [errors, setErrors] = useState({});
     const [formError, setFormError] = useState('');
@@ -33,7 +34,7 @@ export default function Register() {
         setLoading(true);
         try {
             await auth.register(form);
-            navigate('/xac-thuc');
+            navigate('/xac-thuc', { state: { from: location.state?.from } });
         } catch (err) {
             if (err.field) setErrors((x) => ({ ...x, [err.field]: err.message }));
             else setFormError(err.message);

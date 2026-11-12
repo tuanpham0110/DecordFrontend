@@ -5,7 +5,8 @@
     * with realistic latency and error shapes ({ message, field? }), so swapping in
     * a real backend means replacing the bodies of these functions – nothing else.
     */
-import { STAGES, VOCABULARY, HANDBOOK, DEMO_PROGRESS } from '../data/content.js';
+import { HANDBOOK, SENTENCES, VOCABULARY } from '../data/content.js';
+import { engine } from './server/engine.js';
 
 const LATENCY = 450;
 const wait = (ms = LATENCY) => new Promise((r) => setTimeout(r, ms));
@@ -36,15 +37,33 @@ function safeSet(key, value) {
     }
 }
 
+function sessionGet() {
+    try {
+        const raw = sessionStorage.getItem(SESSION_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+function sessionSet(value) {
+    try {
+        if (value === null) sessionStorage.removeItem(SESSION_KEY);
+        else sessionStorage.setItem(SESSION_KEY, JSON.stringify(value));
+    } catch {
+        /* ignore */
+    }
+}
+
 function users() {
     const list = safeGet(USERS_KEY, []);
     return list.some((u) => u.email === DEMO_USER.email) ? list : [DEMO_USER, ...list];
 }
 
-class ApiError extends Error {
-    constructor(message, field) {
+export class ApiError extends Error {
+    constructor(message, field, extra = {}) {
         super(message);
         this.field = field;
+        Object.assign(this, extra);
     }
 }
 
@@ -53,7 +72,8 @@ const publicUser = ({ name, email }) => ({ name, email });
 /* ───────────── Auth ───────────── */
 export const auth = {
     currentSession() {
-        return safeGet(SESSION_KEY, null);
+        // "remember me" sessions live in localStorage; others only for this tab
+        return safeGet(SESSION_KEY, null) || sessionGet();
     },
 
     async login({ email, password, remember }) {
@@ -68,6 +88,7 @@ export const auth = {
         }
         const session = publicUser(user);
         if (remember) safeSet(SESSION_KEY, session);
+        sessionSet(session);
         return session;
     },
 
@@ -135,73 +156,74 @@ export const auth = {
 
     logout() {
         safeSet(SESSION_KEY, null);
+        sessionSet(null);
     },
 };
 
 /* ───────────── Learning ───────────── */
-function decorateStages(progress) {
-    const done = new Set(progress.completedLessonIds);
-    return STAGES.map((s) => {
-        const completed = s.lessons.filter((l) => done.has(l.id)).length;
-        const lessons = s.lessons.map((l) => ({
-            ...l,
-            status: done.has(l.id) ? 'done' : l.id === progress.currentLessonId ? 'current' : 'todo',
-        }));
-        const percent = Math.round((completed / s.lessons.length) * 100);
-        return {
-            ...s,
-            lessons,
-            completed,
-            total: s.lessons.length,
-            percent,
-            status: percent === 100 ? 'done' : completed > 0 || lessons.some((l) => l.status === 'current') ? 'active' : 'locked',
-        };
-    });
+const TIMEOUT = 10000;
+
+/** The signed-in learner. A real backend reads this from the auth token. */
+function me() {
+    const s = auth.currentSession();
+    if (!s?.email) throw new ApiError('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', undefined, { status: 401 });
+    return s.email;
+}
+
+/**
+ * Runs a server call with simulated latency and a timeout, normalising errors
+ * to ApiError { message, status, code, field }.
+ */
+async function call(fn, ms = 260) {
+    const work = (async () => {
+        await wait(ms);
+        try {
+            return fn();
+        } catch (e) {
+            throw new ApiError(e.message || 'Đã có lỗi xảy ra.', e.field, { status: e.status ?? 500, code: e.code });
+        }
+    })();
+    const timeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new ApiError('Máy chủ phản hồi quá lâu. Vui lòng thử lại.', undefined, { status: 408 })), TIMEOUT)
+    );
+    return Promise.race([work, timeout]);
 }
 
 export const learning = {
-    async overview() {
-        await wait();
-        const stages = decorateStages(DEMO_PROGRESS);
-        const total = stages.reduce((n, s) => n + s.total, 0);
-        const completed = stages.reduce((n, s) => n + s.completed, 0);
-        const currentStage = stages.find((s) => s.lessons.some((l) => l.id === DEMO_PROGRESS.currentLessonId));
-        const currentLesson = currentStage?.lessons.find((l) => l.id === DEMO_PROGRESS.currentLessonId);
-        return {
-            stages,
-            total,
-            completed,
-            percent: Math.round((completed / total) * 100),
-            current: currentLesson ? { stage: currentStage, lesson: currentLesson } : null,
-            streakDays: DEMO_PROGRESS.streakDays,
-            averageScore: DEMO_PROGRESS.averageScore,
-            activity: DEMO_PROGRESS.activity,
-            badges: DEMO_PROGRESS.badges,
-        };
-    },
+    overview: () => call(() => engine.overview(me()), 380),
+    stage: (id) => call(() => engine.stage(me(), id), 280),
+    lessonInfo: (id) => call(() => engine.lessonInfo(me(), id), 280),
+    startLesson: (id) => call(() => engine.startLesson(me(), id), 380),
+    saveStep: (lessonId, step) => call(() => engine.saveStep(me(), lessonId, step), 60),
+    answer: (lessonId, itemId, response) => call(() => engine.answer(me(), lessonId, itemId, response), 220),
+    rateShadow: (lessonId, itemId, rating) => call(() => engine.rateShadow(me(), lessonId, itemId, rating), 180),
+    finishLesson: (lessonId) => call(() => engine.finishLesson(me(), lessonId), 500),
+    restartLesson: (lessonId) => call(() => engine.restartLesson(me(), lessonId), 150),
+    history: () => call(() => engine.history(me()), 250),
+    setGoal: (goal) => call(() => engine.setGoal(me(), goal), 200),
 
-    async stage(id) {
-        await wait(300);
-        const stage = decorateStages(DEMO_PROGRESS).find((s) => s.id === Number(id));
-        if (!stage) throw new ApiError('Không tìm thấy chặng học.');
-        return stage;
-    },
-
+    /** Public, account-free data. */
     async vocabulary() {
-        await wait(250);
+        await wait(200);
         return VOCABULARY;
     },
-
-    async searchVocabulary(q) {
-        await wait(220);
-        const norm = (s) => s.normalize('NFC').toLowerCase().trim();
-        const query = norm(q);
-        if (!query) return VOCABULARY;
-        return VOCABULARY.filter((v) => norm(v.word).includes(query) || norm(v.meaning).includes(query));
-    },
-
     async handbook() {
-        await wait(300);
-        return HANDBOOK;
+        await wait(260);
+        return { articles: HANDBOOK, vocabulary: VOCABULARY, sentences: SENTENCES };
     },
+};
+
+export const review = {
+    queue: (opts) => call(() => engine.reviewQueue(me(), opts), 300),
+    list: () => call(() => engine.reviewList(me()), 260),
+    answer: (itemId, response) => call(() => engine.reviewAnswer(me(), itemId, response), 220),
+};
+
+export const notebook = {
+    catalog: () => call(() => engine.catalog(me()), 260),
+    list: () => call(() => engine.notebook(me()), 260),
+    save: (entry) => call(() => engine.saveToNotebook(me(), entry), 180),
+    remove: (id) => call(() => engine.removeFromNotebook(me(), id), 160),
+    toggleFavorite: (id) => call(() => engine.toggleFavorite(me(), id), 140),
+    markCard: (id, known) => call(() => engine.markFlashcard(me(), id, known), 80),
 };
