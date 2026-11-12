@@ -1,0 +1,575 @@
+/* ───────────── Button ───────────── */
+.btn {
+    --btn-bg: var(--clay-600);
+    --btn-bg-hover: var(--clay-700);
+    --btn-bg-active: var(--clay-800);
+    --btn-fg: #fff;
+    --btn-border: transparent;
+
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-2);
+    height: 44px;
+    padding: 0 var(--s-6);
+    border: 1.5px solid var(--btn-border);
+    border-radius: var(--r-pill);
+    background: var(--btn-bg);
+    color: var(--btn-fg);
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+    transition: background-color var(--dur) var(--ease), border-color var(--dur) var(--ease),
+        color var(--dur) var(--ease), transform var(--dur) var(--ease);
+    user-select: none;
+}
+.btn:hover {
+    background: var(--btn-bg-hover);
+}
+.btn:active {
+    background: var(--btn-bg-active);
+    transform: translateY(1px);
+}
+.btn .icon {
+    transition: transform var(--dur) var(--ease);
+}
+.btn:hover .icon--arrow-right {
+    transform: translateX(3px);
+}
+
+.btn--sm {
+    height: 36px;
+    padding: 0 var(--s-4);
+    font-size: var(--text-xs);
+}
+.btn--lg {
+    height: 52px;
+    padding: 0 var(--s-8);
+    font-size: var(--text-base);
+}
+.btn--block {
+    width: 100%;
+}
+
+.btn--green {
+    --btn-bg: var(--forest-700);
+    --btn-bg-hover: var(--forest-800);
+    --btn-bg-active: var(--forest-900);
+}
+.btn--leaf {
+    --btn-bg: var(--leaf-500);
+    --btn-bg-hover: #3f9123;
+    --btn-bg-active: #347a1d;
+}
+.btn--outline {
+    --btn-bg: transparent;
+    --btn-bg-hover: var(--forest-950);
+    --btn-bg-active: var(--forest-900);
+    --btn-fg: var(--forest-950);
+    --btn-border: var(--forest-950);
+}
+.btn--outline:hover {
+    --btn-fg: #fff;
+}
+.btn--outline-clay {
+    --btn-bg: transparent;
+    --btn-bg-hover: var(--clay-500);
+    --btn-bg-active: var(--clay-600);
+    --btn-fg: var(--clay-600);
+    --btn-border: var(--clay-500);
+}
+.btn--outline-clay:hover {
+    --btn-fg: #fff;
+}
+.btn--ghost {
+    --btn-bg: transparent;
+    --btn-bg-hover: var(--paper-2);
+    --btn-bg-active: var(--line);
+    --btn-fg: var(--forest-950);
+}
+.btn--light {
+    --btn-bg: #fff;
+    --btn-bg-hover: var(--paper);
+    --btn-bg-active: var(--paper-2);
+    --btn-fg: var(--forest-950);
+    --btn-border: var(--line);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+    cursor: not-allowed;
+    transform: none;
+    --btn-bg: var(--clay-200);
+    --btn-bg-hover: var(--clay-200);
+    --btn-bg-active: var(--clay-200);
+}
+.btn--green:disabled,
+.btn--leaf:disabled {
+    --btn-bg: var(--leaf-200);
+    --btn-bg-hover: var(--leaf-200);
+    --btn-bg-active: var(--leaf-200);
+}
+.btn--outline:disabled,
+.btn--light:disabled,
+.btn--ghost:disabled {
+    --btn-bg: transparent;
+    --btn-fg: var(--subtle);
+    --btn-border: var(--line);
+}
+.btn.is-loading {
+    color: transparent;
+    pointer-events: none;
+}
+.btn.is-loading .spinner {
+    position: absolute;
+    color: var(--btn-fg);
+}
+
+/* Text link with the orange underline used across the design */
+.link {
+    color: var(--forest-700);
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    transition: color var(--dur) var(--ease), text-decoration-color var(--dur) var(--ease);
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+}
+.link:hover {
+    color: var(--forest-900);
+    text-decoration-color: var(--clay-500);
+}
+.link:disabled {
+    color: var(--subtle);
+    cursor: default;
+    text-decoration-color: transparent;
+}
+
+/* ───────────── Spinner ───────────── */
+.spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ───────────── Fields ───────────── */
+.field {
+    display: grid;
+    gap: 6px;
+}
+.field__control {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 var(--s-4);
+    gap: var(--s-3);
+    background: #fff;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-pill);
+    transition: border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease);
+}
+.field__control:hover {
+    border-color: var(--leaf-300);
+}
+.field__control:focus-within {
+    border-color: var(--forest-700);
+    box-shadow: 0 0 0 3px rgba(27, 102, 72, 0.14);
+}
+.field__icon {
+    flex: none;
+    color: var(--forest-700);
+}
+.field__input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    outline: none;
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
+    color: var(--ink);
+}
+.field__input:focus-visible,
+.otp__cell:focus-visible {
+    box-shadow: none;
+}
+.field__input::placeholder {
+    color: var(--subtle);
+}
+.field__action {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    margin-right: -6px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--ink-2);
+    transition: background-color var(--dur) var(--ease);
+}
+.field__action:hover {
+    background: var(--paper-2);
+}
+.field.has-error .field__control {
+    border-color: var(--danger);
+}
+.field.has-error .field__control:focus-within {
+    box-shadow: 0 0 0 3px rgba(194, 52, 27, 0.14);
+}
+.field.is-disabled .field__control {
+    background: var(--paper-2);
+    border-color: var(--line);
+}
+.field__msg {
+    padding-left: var(--s-4);
+    font-size: var(--text-xs);
+    color: var(--danger);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.field__hint {
+    padding-left: var(--s-4);
+    font-size: var(--text-xs);
+    color: var(--muted);
+}
+
+/* Search variant – squarer, used inside app pages */
+.field--search .field__control {
+    height: 48px;
+    border-radius: var(--r-md);
+    border-color: var(--line);
+}
+
+/* ───────────── Checkbox ───────────── */
+.check {
+    display: inline-flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    line-height: 1.45;
+}
+.check input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+.check__box {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+    border: 1.75px solid var(--forest-700);
+    border-radius: 5px;
+    background: #fff;
+    color: #fff;
+    transition: background-color var(--dur) var(--ease);
+}
+.check__box svg {
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+.check input:checked + .check__box {
+    background: var(--forest-700);
+}
+.check input:checked + .check__box svg {
+    opacity: 1;
+    transform: none;
+}
+.check input:focus-visible + .check__box {
+    box-shadow: var(--focus-ring);
+}
+.check.has-error .check__box {
+    border-color: var(--danger);
+}
+
+/* ───────────── Progress ───────────── */
+.progress {
+    --value: 0%;
+    --track: var(--paper-2);
+    --fill: var(--forest-600);
+    position: relative;
+    height: 8px;
+    border-radius: var(--r-pill);
+    background: var(--track);
+    overflow: hidden;
+}
+.progress::after {
+    content: '';
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: var(--value);
+    border-radius: inherit;
+    background: var(--fill);
+    transition: width 600ms var(--ease);
+}
+.progress--leaf {
+    --track: #e6eddc;
+    --fill: var(--leaf-300);
+}
+.progress--clay {
+    --track: #f7dcc0;
+    --fill: var(--clay-300);
+}
+.progress--river {
+    --track: var(--river-200);
+    --fill: var(--river-500);
+}
+
+/* ───────────── Ring (donut) ───────────── */
+.ring {
+    position: relative;
+    display: grid;
+    place-items: center;
+}
+.ring svg {
+    transform: rotate(-90deg);
+}
+.ring__track {
+    stroke: var(--leaf-100);
+}
+.ring__fill {
+    stroke: #62844f;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 900ms var(--ease);
+}
+.ring__label {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-content: center;
+    text-align: center;
+}
+
+/* ───────────── Badge / Tag ───────────── */
+.tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: var(--r-pill);
+    background: var(--clay-100);
+    color: var(--clay-800);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+}
+.tag--leaf {
+    background: var(--leaf-100);
+    color: var(--forest-800);
+}
+.tag--river {
+    background: var(--river-50);
+    color: #3a5c93;
+}
+.tag--muted {
+    background: var(--paper-2);
+    color: var(--muted);
+}
+
+/* ───────────── Icon badge (circle with halo, from Figma) ───────────── */
+.icon-badge {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--leaf-500);
+    color: #fff;
+    box-shadow: 0 0 0 5px var(--leaf-200);
+}
+.icon-badge--warm {
+    background: #fff1c2;
+    color: #ff6200;
+    box-shadow: 0 0 0 5px #fffbe8;
+}
+.icon-badge--sm {
+    width: 36px;
+    height: 36px;
+    box-shadow: 0 0 0 4px var(--leaf-200);
+}
+.icon-badge--warm.icon-badge--sm {
+    box-shadow: 0 0 0 4px #fffbe8;
+}
+
+/* ───────────── Panel ───────────── */
+.panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+}
+.panel__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-4);
+    padding: var(--s-5) var(--s-6) 0;
+}
+.panel__title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    font-size: var(--text-md);
+}
+.panel__body {
+    padding: var(--s-5) var(--s-6) var(--s-6);
+}
+.more-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--forest-700);
+    transition: gap var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+.more-link:hover {
+    gap: 8px;
+    color: var(--forest-900);
+}
+
+/* ───────────── Empty / Error state ───────────── */
+.state {
+    display: grid;
+    justify-items: center;
+    gap: var(--s-3);
+    padding: var(--s-12) var(--s-6);
+    text-align: center;
+}
+.state__art {
+    width: 120px;
+    margin-bottom: var(--s-2);
+}
+.state__title {
+    font-size: var(--text-md);
+}
+.state__text {
+    max-width: 380px;
+    color: var(--muted);
+    font-size: var(--text-sm);
+}
+.state--error .state__title {
+    color: var(--danger);
+}
+
+/* ───────────── Skeleton ───────────── */
+.skeleton {
+    border-radius: var(--r-sm);
+    background: linear-gradient(90deg, var(--paper-2) 0%, #fbf8f2 50%, var(--paper-2) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.3s ease-in-out infinite;
+}
+@keyframes shimmer {
+    from {
+        background-position: 200% 0;
+    }
+    to {
+        background-position: -200% 0;
+    }
+}
+
+/* ───────────── Toast ───────────── */
+.toasts {
+    position: fixed;
+    z-index: 100;
+    right: var(--s-6);
+    bottom: var(--s-6);
+    display: grid;
+    gap: var(--s-2);
+    width: min(360px, calc(100vw - 32px));
+}
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    background: var(--forest-950);
+    color: #fff;
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-3);
+    font-size: var(--text-sm);
+    animation: toast-in 240ms var(--ease);
+}
+.toast__icon {
+    flex: none;
+    margin-top: 2px;
+    color: #9fd88b;
+}
+.toast--error .toast__icon {
+    color: #ffb4a3;
+}
+.toast__close {
+    margin-left: auto;
+    border: 0;
+    background: none;
+    color: rgba(255, 255, 255, 0.6);
+    padding: 2px;
+    border-radius: 4px;
+}
+.toast__close:hover {
+    color: #fff;
+}
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}
+@media (max-width: 640px) {
+    .toasts {
+        right: 16px;
+        bottom: 16px;
+    }
+}
+
+/* ───────────── Divider with label ───────────── */
+.divider {
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    color: var(--muted);
+    font-size: var(--text-xs);
+}
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--line);
+}
+
+/* ───────────── Section heading ───────────── */
+.eyebrow {
+    font-family: var(--font-display);
+    font-size: var(--text-xs);
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--clay-600);
+}
