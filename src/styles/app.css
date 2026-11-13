@@ -1589,3 +1589,192 @@ a.history__main:hover strong {
         width: 110px;
     }
 }
+
+/* ═══════════ Sidebar v2 ═══════════ */
+.sidebar {
+    padding: var(--s-6) var(--s-4) 0;
+    background: linear-gradient(180deg, #1d6a4a 0%, #185c40 100%);
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar {
+    display: none;
+}
+.sidebar__brand {
+    padding: var(--s-2) var(--s-3) var(--s-6);
+}
+.sidebar__nav {
+    gap: var(--s-4);
+}
+.sidebar__group {
+    display: grid;
+    gap: 2px;
+}
+.sidebar__label {
+    padding: 0 var(--s-4) 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+}
+.sidebar__link {
+    position: relative;
+    height: 44px;
+}
+.sidebar__link.active {
+    background: rgba(255, 255, 255, 0.14);
+    box-shadow: inset 3px 0 0 #b8e07a;
+}
+.sidebar__link.active .icon {
+    color: #c8ec8f;
+}
+.sidebar__badge {
+    display: grid;
+    place-items: center;
+    min-width: 22px;
+    height: 20px;
+    margin-left: auto;
+    padding: 0 6px;
+    border-radius: var(--r-pill);
+    background: var(--clay-500);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* "Đang học" mini card */
+.side-card {
+    display: grid;
+    gap: 6px;
+    margin-top: var(--s-6);
+    padding: var(--s-4);
+    border-radius: var(--r-lg);
+    background: #fff;
+    color: var(--ink);
+    box-shadow: 0 10px 24px -14px rgba(0, 0, 0, 0.5);
+    transition: transform var(--dur) var(--ease);
+}
+.side-card:hover {
+    transform: translateY(-2px);
+}
+.side-card__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--clay-700);
+}
+.side-card__label .icon {
+    color: var(--leaf-500);
+}
+.side-card strong {
+    font-family: var(--font-display);
+    font-size: 14px;
+    line-height: 1.35;
+    color: var(--forest-950);
+}
+.side-card__bar {
+    display: block;
+    height: 6px;
+    border-radius: var(--r-pill);
+    background: var(--leaf-100);
+    overflow: hidden;
+}
+.side-card__bar > span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--leaf-500);
+}
+.side-card__bar--warm {
+    background: rgba(255, 255, 255, 0.14);
+}
+.side-card__bar--warm > span {
+    background: linear-gradient(90deg, #f9b445, #f97316);
+}
+.side-card__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--forest-700);
+}
+
+/* "Hôm nay" widget */
+.side-today {
+    display: grid;
+    gap: 8px;
+    margin-top: var(--s-3);
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-lg);
+    background: rgba(0, 0, 0, 0.14);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 13px;
+    transition: background-color var(--dur);
+}
+.side-today:hover {
+    background: rgba(0, 0, 0, 0.2);
+}
+.side-today__row {
+    display: flex;
+    justify-content: space-between;
+}
+.side-today__row b {
+    color: #fff;
+}
+.side-today__streak {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+}
+.side-today__streak .icon {
+    color: #f9b445;
+}
+
+/* Hills + mascot at the bottom */
+.sidebar__foot {
+    position: relative;
+    flex: none;
+    margin: auto calc(var(--s-4) * -1) 0;
+    padding: var(--s-6) var(--s-5) 0;
+    min-height: 170px;
+    border-radius: 0;
+    background: none;
+}
+.sidebar__foot p {
+    position: relative;
+    z-index: 2;
+    max-width: 130px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.85);
+}
+.sidebar__mascot {
+    position: absolute;
+    z-index: 2;
+    right: 14px;
+    bottom: 26px;
+    top: auto;
+    width: 92px;
+}
+.sidebar__hills {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1;
+    width: 100%;
+    height: 90px;
+}
+@media (max-height: 780px) {
+    .side-today {
+        display: none;
+    }
+    .sidebar__foot {
+        min-height: 130px;
+    }
+}

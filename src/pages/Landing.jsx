@@ -319,7 +319,6 @@ export default function Landing() {
                 </div>
                 <div className="lp-journey__art" aria-hidden="true">
                     <img src="/assets/journey-landscape.webp" alt="" loading="lazy" />
-                    <img className="lp-journey__path" src="/assets/journey-path.webp" alt="" loading="lazy" />
                 </div>
             </section>
 
