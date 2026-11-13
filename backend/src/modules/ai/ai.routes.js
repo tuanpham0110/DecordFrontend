@@ -9,6 +9,7 @@ import { env } from '../../config/env.js';
 import { ah, parse } from '../../lib/http.js';
 import { HttpError, tooMany, unavailable } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
+import { prisma } from '../../lib/prisma.js';
 import { dayKey } from '../../lib/time.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { aiLimiter } from '../../middleware/rateLimit.js';
@@ -35,14 +36,16 @@ ${verified}
 Từ chối lịch sự các yêu cầu không liên quan tới việc học ngôn ngữ, văn hoá Mường hoặc cách dùng MUONGLAB.`;
 }
 
-/* Per-user daily quota (in memory – resets on restart; move to Redis/DB when scaling out). */
-const usage = new Map();
-function takeQuota(userId) {
-    const key = `${dayKey()}:${userId}`;
-    const n = (usage.get(key) ?? 0) + 1;
-    if (n > env.AI_DAILY_LIMIT) throw tooMany(`Bạn đã dùng hết ${env.AI_DAILY_LIMIT} lượt hỏi AI hôm nay. Hẹn bạn ngày mai nhé!`, { code: 'ai-quota' });
-    usage.set(key, n);
-    if (usage.size > 10_000) for (const k of usage.keys()) if (!k.startsWith(dayKey())) usage.delete(k);
+/* Per-user daily quota, counted in the DB so it holds across serverless instances and restarts. */
+async function takeQuota(userId) {
+    const day = dayKey();
+    const { count } = await prisma.aiUsage.upsert({
+        where: { userId_day: { userId, day } },
+        create: { userId, day, count: 1 },
+        update: { count: { increment: 1 } },
+        select: { count: true },
+    });
+    if (count > env.AI_DAILY_LIMIT) throw tooMany(`Bạn đã dùng hết ${env.AI_DAILY_LIMIT} lượt hỏi AI hôm nay. Hẹn bạn ngày mai nhé!`, { code: 'ai-quota' });
 }
 
 function geminiError(status, body) {
@@ -71,7 +74,7 @@ aiRoutes.post(
         const { messages } = parse(schema, req.body);
         const firstUser = messages.findIndex((m) => m.role === 'user');
         if (firstUser < 0) throw new HttpError(400, 'Thiếu câu hỏi.');
-        takeQuota(req.user.id);
+        await takeQuota(req.user.id);
 
         const C = await getContent();
         const ctrl = new AbortController();

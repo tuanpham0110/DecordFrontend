@@ -39,6 +39,7 @@ model User {
   cards    ReviewCard[]
   notebook NotebookEntry[]
   daily    DailyActivity[]
+  aiUsage  AiUsage[]
 }
 
 model OtpCode {
@@ -216,6 +217,16 @@ model DailyActivity {
   answered Int    @default(0)
   correct  Int    @default(0)
   user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+}
+
+/// AI tutor questions asked per day (daily quota; kept in the DB so it holds across serverless instances).
+model AiUsage {
+  userId String
+  day    String // YYYY-MM-DD in APP_TIMEZONE
+  count  Int    @default(0)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([userId, day])
 }
