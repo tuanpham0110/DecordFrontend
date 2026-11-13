@@ -1292,3 +1292,100 @@ a.user-menu__item {
 .app__content {
     padding-bottom: 104px;
 }
+
+
+/* ───────────── Learning history ───────────── */
+.hist-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-4);
+    margin: 0 0 var(--s-6);
+    padding: 0;
+    list-style: none;
+}
+.hist-stats li {
+    display: flex;
+    gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-4) var(--s-5);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+}
+.hist-stats div {
+    display: grid;
+    min-width: 0;
+}
+.hist-stats strong {
+    font-size: var(--text-lg);
+    font-weight: 700;
+    line-height: 1.2;
+    color: var(--forest-950);
+    font-variant-numeric: tabular-nums;
+}
+.hist-stats div span {
+    font-size: 13px;
+    color: var(--muted);
+}
+.hist-stats__icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-md);
+    background: var(--leaf-50);
+    color: var(--forest-700);
+}
+.hist-stats__icon--clay {
+    background: var(--clay-50);
+    color: var(--clay-700);
+}
+.hist-stats__icon--river {
+    background: var(--river-50);
+    color: var(--river-500);
+}
+.hist-day {
+    padding: var(--s-5) var(--s-6);
+}
+.hist-day + .hist-day {
+    margin-top: var(--s-4);
+}
+.hist-day__title {
+    margin-bottom: var(--s-1);
+    font-size: var(--text-sm);
+    font-weight: 700;
+    color: var(--ink-2);
+}
+.hist-day__title::first-letter {
+    text-transform: uppercase;
+}
+.hist-day__list time {
+    flex: none;
+    font-size: 13px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+.hist__none {
+    margin-top: var(--s-4);
+    text-align: center;
+}
+@media (max-width: 900px) {
+    .hist-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+@media (max-width: 560px) {
+    .hist-stats {
+        gap: var(--s-3);
+    }
+    .hist-stats li {
+        padding: var(--s-3) var(--s-4);
+    }
+    .hist-day {
+        padding: var(--s-4);
+    }
+}
+.hist-day__list {
+    padding: 0;
+}

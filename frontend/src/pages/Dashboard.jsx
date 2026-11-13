@@ -294,7 +294,11 @@ export default function Dashboard() {
                 <section className="panel">
                     <div className="panel__head">
                         <h2 className="panel__title">Hoạt động gần đây</h2>
-                        {stats.minutes > 0 && <span className="muted small">{stats.minutes} phút đã học</span>}
+                        {data.recent.length > 0 && (
+                            <Link to="/lich-su" className="more-link">
+                                Lịch sử học <Icon name="arrow-right" size={16} />
+                            </Link>
+                        )}
                     </div>
                     {data.recent.length ? (
                         <ul className="history panel__body">

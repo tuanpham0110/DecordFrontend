@@ -21,6 +21,7 @@ import ReviewSession from './pages/ReviewSession.jsx';
 import Notebook from './pages/Notebook.jsx';
 import Handbook from './pages/Handbook.jsx';
 import Account from './pages/Account.jsx';
+import History from './pages/History.jsx';
 import { Privacy, Terms } from './pages/Legal.jsx';
 import NotFound from './pages/NotFound.jsx';
 
@@ -97,6 +98,7 @@ export default function App() {
                     <Route path="so-tay" element={<Notebook />} />
                     <Route path="cam-nang" element={<Handbook />} />
                     <Route path="tai-khoan" element={<Account />} />
+                    <Route path="lich-su" element={<History />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

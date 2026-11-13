@@ -25,7 +25,9 @@ const FEATURES = [
     { title: 'Sổ tay của tôi', sub: 'Từ và câu đã lưu', to: '/so-tay', icon: 'notebook', keys: 'so tay luu yeu thich' },
     { title: 'Kho từ vựng & câu mẫu', sub: 'Toàn bộ từ, câu trong chương trình', to: '/so-tay?tab=all', icon: 'bookmark', keys: 'tu vung cau mau tra cuu' },
     { title: 'Cẩm nang', sub: 'Phương pháp học, phát âm, văn hoá', to: '/cam-nang', icon: 'guide', keys: 'huong dan cam nang' },
-    { title: 'Trợ lý AI Ếch Mường', sub: 'Hỏi đáp về từ vựng, cách học', action: 'chat', icon: 'sparkle', keys: 'ai chatbot hoi dap tro ly gemini' },
+    { title: 'Lịch sử học', sub: 'Điểm số từng lần làm bài', to: '/lich-su', icon: 'calendar', keys: 'lich su ket qua diem hoat dong' },
+    { title: 'Tài khoản', sub: 'Hồ sơ, mục tiêu ngày, đổi mật khẩu', to: '/tai-khoan', icon: 'user', keys: 'tai khoan ho so mat khau cai dat dang xuat' },
+    { title: 'Trợ lý AI Ếch Mường', sub: 'Hỏi đáp về từ vựng, cách học', action: 'chat', icon: 'sparkle', keys: 'ai chatbot hoi dap tro ly' },
     { title: 'Học thử 5 phút', sub: 'Bài học thử không lưu tiến độ', to: '/hoc-thu', icon: 'play', keys: 'hoc thu demo' },
 ];
 

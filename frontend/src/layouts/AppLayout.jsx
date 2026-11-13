@@ -49,6 +49,10 @@ function UserMenu() {
                         <Icon name="user" size={18} />
                         Tài khoản
                     </Link>
+                    <Link role="menuitem" to="/lich-su" className="user-menu__item">
+                        <Icon name="calendar" size={18} />
+                        Lịch sử học
+                    </Link>
                     <button role="menuitem" className="user-menu__item user-menu__item--danger" onClick={logout}>
                         <Icon name="logout" size={18} />
                         Đăng xuất
