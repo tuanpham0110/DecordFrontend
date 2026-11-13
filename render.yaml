@@ -1,12 +1,5 @@
-# Render Blueprint – tạo database PostgreSQL + backend API chỉ với một lần bấm.
-# Render → New → Blueprint → chọn repo này.
-
-databases:
-  - name: muonglab-db
-    plan: free
-    region: singapore
-    databaseName: muonglab
-    user: muonglab
+# Render Blueprint – tạo backend API. Database dùng Neon (PostgreSQL miễn phí, không hết hạn).
+# Render → New → Blueprint → chọn repo này → dán chuỗi kết nối Neon vào DATABASE_URL.
 
 services:
   - type: web
@@ -24,10 +17,9 @@ services:
         value: "22"
       - key: NODE_ENV
         value: production
+      # Chuỗi kết nối từ Neon (bản "Direct connection", không phải "Pooled")
       - key: DATABASE_URL
-        fromDatabase:
-          name: muonglab-db
-          property: connectionString
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: CORS_ORIGIN
