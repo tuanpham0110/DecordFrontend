@@ -39,11 +39,39 @@ export function gradeResponse(item, response) {
     return norm(response) === norm(item.answer);
 }
 
-/** What the client may see before answering. */
-export function publicItem(C, id) {
+/* ───────────── Option order ─────────────
+ * Authors usually write the right answer first, so the stored order must never reach the learner
+ * (always pressing "A" would pass the lesson). Options are shuffled per presentation:
+ *  - with a seed (lesson session) the order is stable while that session lasts,
+ *  - without one (trial, review) it is different every time.
+ */
+function seededRandom(seed) {
+    let h = 2166136261;
+    for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+    let a = h >>> 0;
+    // mulberry32
+    return () => {
+        a = (a + 0x6d2b79f5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+export function shuffled(list, rand = Math.random) {
+    const a = [...list];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+/** What the client may see before answering. `seed` keeps the option order stable (see above). */
+export function publicItem(C, id, seed) {
     const it = C.ITEMS[id];
     if (!it) return null;
     const { answer, explain, translation, ...rest } = it;
+    if (Array.isArray(rest.options)) rest.options = shuffled(rest.options, seed == null ? Math.random : seededRandom(`${seed}:${id}`));
     return { id, ...rest };
 }
 export function revealed(C, id) {

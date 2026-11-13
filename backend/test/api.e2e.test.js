@@ -11,6 +11,8 @@ import jwt from 'jsonwebtoken';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetGoogleKeyCache, verifyGoogleIdToken } from '../src/lib/google.js';
+import { publicItem } from '../src/modules/learning/rules.js';
+import { ITEMS } from '../prisma/data/content.js';
 
 let server;
 let base;
@@ -233,6 +235,47 @@ describe('account', () => {
     test('meta lists what the server has configured', async () => {
         const m = (await api('GET', '/meta', null, false)).data;
         for (const k of ['ai', 'speech', 'mail', 'emailVerification', 'passwordReset', 'googleClientId']) assert.ok(k in m, k);
+    });
+});
+
+describe('answer options are shuffled', () => {
+    const C = { ITEMS };
+    const choiceIds = Object.keys(ITEMS).filter((id) => Array.isArray(ITEMS[id].options));
+    const sorted = (a) => [...a].sort();
+
+    test('same options, never the answer key itself', () => {
+        for (const id of choiceIds) {
+            const pub = publicItem(C, id, 'seed');
+            assert.deepEqual(sorted(pub.options), sorted(ITEMS[id].options), id);
+            assert.equal(pub.answer, undefined);
+        }
+    });
+    test('stable within a session, different across sessions', () => {
+        const id = choiceIds[0];
+        assert.deepEqual(publicItem(C, id, 'user:1').options, publicItem(C, id, 'user:1').options);
+        const orders = new Set(Array.from({ length: 40 }, (_, i) => publicItem(C, id, `user:${i}`).options.join('|')));
+        assert.ok(orders.size > 5, `only ${orders.size} distinct orders`);
+    });
+    test('the right answer is not parked on "A"', () => {
+        for (const id of choiceIds) {
+            const first = Array.from({ length: 400 }, (_, i) => publicItem(C, id, `s${i}`).options[0] === ITEMS[id].answer).filter(Boolean).length;
+            const expected = 400 / ITEMS[id].options.length;
+            assert.ok(Math.abs(first - expected) < expected * 0.5, `${id}: answer first ${first}/400 times`);
+        }
+        // unseeded (trial / review) is random too
+        const id = choiceIds[0];
+        assert.ok(new Set(Array.from({ length: 40 }, () => publicItem(C, id).options.join('|'))).size > 5);
+    });
+    test('a started lesson serves shuffled options that still grade correctly', async () => {
+        await api('DELETE', '/me/lessons/1/session');
+        const r = await api('POST', '/me/lessons/1/session');
+        const it = r.data.parts.flatMap((p) => p.items).find((x) => x.id === 'l1-ep-em');
+        assert.deepEqual(sorted(it.options), sorted(ITEMS['l1-ep-em'].options));
+        const again = await api('POST', '/me/lessons/1/session');
+        assert.deepEqual(again.data.parts.flatMap((p) => p.items).find((x) => x.id === 'l1-ep-em').options, it.options, 'order survives a resume');
+        const a = await api('POST', '/me/lessons/1/session/answers', { itemId: 'l1-ep-em', response: ITEMS['l1-ep-em'].answer });
+        assert.equal(a.data.correct, true);
+        await api('DELETE', '/me/lessons/1/session');
     });
 });
 

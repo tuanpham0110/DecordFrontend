@@ -146,7 +146,10 @@ export const learningService = {
         return {
             lesson: { id: lesson.id, title: lesson.title, minutes: lesson.minutes, goals: lesson.goals ?? [] },
             stage: { id: stage.id, title: stage.title, tone: stage.tone },
-            parts: PART_ORDER.map((p) => ({ ...C.PARTS[p], items: (lesson.parts?.[p] ?? []).map((iid) => publicItem(C, iid)) })).filter((p) => p.items.length),
+            // seeded by the session: the order of the choices stays put if the learner leaves and resumes
+            parts: PART_ORDER.map((p) => ({ ...C.PARTS[p], items: (lesson.parts?.[p] ?? []).map((iid) => publicItem(C, iid, `${userId}:${session.startedAt}`)) })).filter(
+                (p) => p.items.length
+            ),
             session: { step: session.step, answers: answered, shadow: session.shadow },
             threshold: C.PASS_THRESHOLD,
             best: data.lessons[lesson.id]?.best ?? null,
