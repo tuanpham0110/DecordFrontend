@@ -19,6 +19,7 @@ const schemas = {
     register: z.object({ name, email, password }),
     login: z.object({ email, password: z.string().min(1, 'Vui lòng nhập mật khẩu.'), remember: z.boolean().optional().default(false) }),
     google: z.object({ credential: z.string().min(20).max(4096) }),
+    microsoft: z.object({ idToken: z.string().min(20).max(8192) }),
     forgot: z.object({ email }),
     resend: z.object({ email, purpose }),
     verify: z.object({ email, purpose, code: z.string().regex(/^\d{6}$/, 'Vui lòng nhập đủ 6 chữ số.') }),
@@ -33,6 +34,7 @@ export const authRoutes = Router();
 authRoutes.post('/register', authLimiter, ah(async (req, res) => res.status(201).json(await authService.register(parse(schemas.register, req.body)))));
 authRoutes.post('/login', authLimiter, ah(async (req, res) => res.json(await authService.login(parse(schemas.login, req.body)))));
 authRoutes.post('/google', authLimiter, ah(async (req, res) => res.json(await authService.googleLogin(parse(schemas.google, req.body)))));
+authRoutes.post('/microsoft', authLimiter, ah(async (req, res) => res.json(await authService.microsoftLogin(parse(schemas.microsoft, req.body)))));
 authRoutes.post('/password/forgot', authLimiter, ah(async (req, res) => res.json(await authService.forgotPassword(parse(schemas.forgot, req.body)))));
 authRoutes.post('/password/reset', authLimiter, ah(async (req, res) => res.json(await authService.resetPassword(parse(schemas.reset, req.body)))));
 authRoutes.post('/otp/resend', authLimiter, ah(async (req, res) => res.json(await authService.resendOtp(parse(schemas.resend, req.body)))));

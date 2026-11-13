@@ -29,3 +29,13 @@ export const aiLimiter = rateLimit({
     keyGenerator: (req) => req.user?.id ?? req.ip,
     message: message('Bạn hỏi hơi nhanh. Đợi vài giây rồi hỏi tiếp nhé.'),
 });
+
+/** Messages to support – per signed-in user. */
+export const supportLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    limit: 20,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    keyGenerator: (req) => req.user?.id ?? req.ip,
+    message: message('Bạn gửi tin hơi nhanh. Vui lòng đợi ít phút rồi gửi tiếp.'),
+});

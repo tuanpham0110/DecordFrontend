@@ -67,21 +67,68 @@ function loadGsi() {
     return gsiPromise;
 }
 
-/**
- * Renders Google's own button. Shown only when the backend has GOOGLE_CLIENT_ID configured
- * (see GET /api/meta) – otherwise this section does not appear at all.
- * After a successful sign-in the auth context holds the user and the guest-only route redirects.
- */
-export function SocialLogin({ label = 'Hoặc đăng nhập bằng', onError }) {
-    const meta = useMeta();
+/* ───────────── "Đăng nhập bằng Microsoft" (MSAL popup) ───────────── */
+let msalPromise = null;
+function msalFor(clientId) {
+    msalPromise ??= import('@azure/msal-browser').then(async ({ PublicClientApplication }) => {
+        const app = new PublicClientApplication({
+            auth: { clientId, authority: 'https://login.microsoftonline.com/common', redirectUri: window.location.origin },
+            cache: { cacheLocation: 'sessionStorage' },
+        });
+        await app.initialize();
+        return app;
+    });
+    msalPromise.catch(() => (msalPromise = null));
+    return msalPromise;
+}
+
+function MicrosoftMark() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+        </svg>
+    );
+}
+
+function MicrosoftButton({ clientId, onError }) {
+    const { microsoftLogin } = useAuth();
+    const toast = useToast();
+    const [busy, setBusy] = useState(false);
+
+    async function signIn() {
+        if (busy) return;
+        setBusy(true);
+        try {
+            const app = await msalFor(clientId);
+            const result = await app.loginPopup({ scopes: ['openid', 'profile', 'email'], prompt: 'select_account' });
+            const user = await microsoftLogin(result.idToken);
+            toast(`Chào mừng ${user.name}!`);
+        } catch (e) {
+            // closing the popup is not an error worth showing
+            if (!/user_cancelled|popup_window_error|interaction_in_progress/.test(e?.errorCode ?? '')) onError?.(e?.status != null ? e.message : 'Không đăng nhập được bằng Microsoft. Vui lòng thử lại.');
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    return (
+        <button type="button" className="auth-ms" onClick={signIn} disabled={busy}>
+            <MicrosoftMark />
+            {busy ? 'Đang mở Microsoft…' : 'Tiếp tục với Microsoft'}
+        </button>
+    );
+}
+
+function GoogleButton({ clientId, onError }) {
     const { googleLogin } = useAuth();
     const toast = useToast();
     const slot = useRef(null);
     const [failed, setFailed] = useState(false);
-    const clientId = meta?.googleClientId;
 
     useEffect(() => {
-        if (!clientId) return;
         let alive = true;
         loadGsi()
             .then(() => {
@@ -114,11 +161,24 @@ export function SocialLogin({ label = 'Hoặc đăng nhập bằng', onError }) 
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [clientId]);
 
-    if (!clientId || failed) return null;
+    return failed ? null : <div className="auth-google" ref={slot} />;
+}
+
+/**
+ * Google / Microsoft sign-in. Each button appears only when the backend has its client id
+ * configured (GET /api/meta) – with neither, this whole section is not rendered.
+ * After a successful sign-in the auth context holds the user and the guest-only route redirects.
+ */
+export function SocialLogin({ label = 'Hoặc đăng nhập bằng', onError }) {
+    const meta = useMeta();
+    if (!meta?.googleClientId && !meta?.microsoftClientId) return null;
     return (
         <>
             <div className="divider">{label}</div>
-            <div className="auth-google" ref={slot} />
+            <div className="auth-providers">
+                {meta.googleClientId && <GoogleButton clientId={meta.googleClientId} onError={onError} />}
+                {meta.microsoftClientId && <MicrosoftButton clientId={meta.microsoftClientId} onError={onError} />}
+            </div>
         </>
     );
 }

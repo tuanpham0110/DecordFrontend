@@ -21,6 +21,7 @@ import {
     streakOf,
 } from './rules.js';
 import { addToReview, bumpDaily, loadState, toSession } from './state.js';
+import { supportService } from '../support/support.service.js';
 
 const PART_COUNTER = {
     listen: { correct: 'listenCorrect', total: 'listenTotal' },
@@ -29,7 +30,7 @@ const PART_COUNTER = {
 
 export const learningService = {
     async overview(userId) {
-        const [C, data] = await Promise.all([getContent(), loadState(userId)]);
+        const [C, data, supportUnread] = await Promise.all([getContent(), loadState(userId), supportService.unread(userId)]);
         const stages = decorateStages(C, data);
         const lessons = stages.flatMap((s) => s.lessons.map((l) => ({ ...l, stage: s })));
         const total = lessons.length;
@@ -94,6 +95,7 @@ export const learningService = {
                     .map((c) => ({ itemId: c.itemId, part: c.part, label: itemLabel(C, c.itemId), wrong: c.wrong, lessonId: c.lessonId })),
             },
             recent: data.attempts.slice(0, 5),
+            support: { unread: supportUnread },
             badges: BADGES.map(({ test, ...b }) => ({ ...b, earned: test(data) })),
         };
     },

@@ -43,6 +43,21 @@ export async function sendOtpMail(to, code, purpose) {
     });
 }
 
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+/** Tells the admin mailbox that a learner wrote to support. Silently skipped without SMTP. */
+export async function sendSupportNotice({ name, email, body }) {
+    if (!transport || !env.SUPPORT_EMAIL) return;
+    await transport.sendMail({
+        from: env.MAIL_FROM || `MUONGLAB <${env.SMTP_USER}>`,
+        to: env.SUPPORT_EMAIL,
+        replyTo: email,
+        subject: `[MUONGLAB] Tin nhắn hỗ trợ từ ${name}`,
+        text: `${name} <${email}> vừa nhắn:\n\n${body}\n\nTrả lời trong trang Quản trị → Hỗ trợ.`,
+        html: `<p><strong>${esc(name)}</strong> &lt;${esc(email)}&gt; vừa nhắn:</p><blockquote style="margin:12px 0;padding:12px 16px;background:#faf6ef;border-left:3px solid #1b6648;white-space:pre-wrap">${esc(body)}</blockquote><p>Trả lời trong trang <strong>Quản trị → Hỗ trợ</strong>.</p>`,
+    });
+}
+
 export async function verifyMailer() {
     if (!transport) return false;
     await transport.verify();

@@ -50,7 +50,10 @@ npm run build      # build frontend
 | Gửi email OTP thật | `SMTP_USER`, `SMTP_PASS` | Gmail → bật xác minh 2 bước → tạo *Mật khẩu ứng dụng*. Chưa cấu hình: dev in mã OTP ra console; production bỏ qua bước OTP khi đăng ký và tắt "Quên mật khẩu" |
 | Trợ lý AI "Ếch Mường" | `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS` | Key miễn phí tại aistudio.google.com/apikey. Key chỉ nằm ở backend. Model chính quá tải / bị ngừng thì tự chuyển sang các model dự phòng |
 | Đăng nhập bằng Google | `GOOGLE_CLIENT_ID` | OAuth Client ID loại *Web application* (Google Cloud Console → Credentials), thêm tên miền frontend vào *Authorized JavaScript origins*. Để trống thì nút Google không hiện |
-| So sánh % giọng với người bản địa | `SPEECH_API_URL`, `SPEECH_API_KEY` | Hợp đồng API: xem `backend/src/modules/speech/speech.routes.js` |
+| Đăng nhập bằng Microsoft | `MICROSOFT_CLIENT_ID` | App registration trên entra.microsoft.com (nền tảng *Single-page application*, redirect URI = địa chỉ frontend). Để trống thì nút không hiện |
+| Chấm phát âm | `GEMINI_API_KEY` hoặc `SPEECH_API_URL`, `SPEECH_API_KEY` | Mặc định: Gemini chép lại bản ghi (không biết câu mẫu), code so từng âm tiết với câu mẫu → điểm **ước lượng**. Có `SPEECH_API_URL` thì gọi dịch vụ chấm phát âm riêng |
+| Quản trị viên | `npm run admin:grant -- <email>` (trong `backend/`) | Cấp vai trò admin: trang `/quan-tri` (số liệu, người dùng, hộp thư hỗ trợ). `--create "Họ Tên"` để tạo tài khoản mới, `--revoke` để gỡ |
+| Email liên hệ | `SUPPORT_EMAIL` | Hiện ở trang Hỗ trợ / pháp lý; nhận thông báo khi người học nhắn tin (cần SMTP) |
 
 ## Deploy (Vercel + Neon)
 

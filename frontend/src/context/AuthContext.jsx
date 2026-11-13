@@ -24,8 +24,14 @@ export function AuthProvider({ children }) {
         return u;
     }, []);
 
+    // a session stored earlier may predate a role change (e.g. just made admin)
+    useEffect(() => {
+        if (auth.currentSession()) auth.refresh().then(adopt).catch(() => {});
+    }, [adopt]);
+
     const login = useCallback(async (payload) => adopt(await auth.login(payload)), [adopt]);
     const googleLogin = useCallback(async (credential) => adopt(await auth.google(credential)), [adopt]);
+    const microsoftLogin = useCallback(async (idToken) => adopt(await auth.microsoft(idToken)), [adopt]);
 
     /** Returns the signed-in user, or null when an email OTP still has to be confirmed. */
     const register = useCallback(async (payload) => adopt((await auth.register(payload)).user), [adopt]);
@@ -56,8 +62,8 @@ export function AuthProvider({ children }) {
     }, []);
 
     const value = useMemo(
-        () => ({ user, signedOut, login, googleLogin, register, verifyOtp, updateProfile, changePassword, logout, deleteAccount }),
-        [user, signedOut, login, googleLogin, register, verifyOtp, updateProfile, changePassword, logout, deleteAccount]
+        () => ({ user, signedOut, login, googleLogin, microsoftLogin, register, verifyOtp, updateProfile, changePassword, logout, deleteAccount }),
+        [user, signedOut, login, googleLogin, microsoftLogin, register, verifyOtp, updateProfile, changePassword, logout, deleteAccount]
     );
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

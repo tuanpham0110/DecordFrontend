@@ -5,6 +5,8 @@ import { requireAuth } from '../../middleware/auth.js';
 import { learningService as svc } from './learning.service.js';
 import { reviewService } from '../review/review.service.js';
 import { notebookService } from '../notebook/notebook.service.js';
+import { supportService } from '../support/support.service.js';
+import { supportLimiter } from '../../middleware/rateLimit.js';
 
 const id = z.coerce.number().int().positive();
 const itemId = z.string().min(1).max(100);
@@ -91,3 +93,9 @@ learningRoutes.post(
         res.json(await notebookService.markCard(req.user.id, parse(entryId, req.params.entryId), known));
     })
 );
+
+/* ───── Support (messages to the admins) ───── */
+const supportBody = z.object({ body: z.string({ error: 'Vui lòng nhập nội dung.' }).trim().min(1, 'Vui lòng nhập nội dung.').max(2000, 'Tin nhắn tối đa 2000 ký tự.') });
+learningRoutes.get('/support', ah(async (req, res) => res.json(await supportService.thread(req.user.id))));
+learningRoutes.get('/support/unread', ah(async (req, res) => res.json({ unread: await supportService.unread(req.user.id) })));
+learningRoutes.post('/support', supportLimiter, ah(async (req, res) => res.status(201).json(await supportService.send(req.user, parse(supportBody, req.body).body))));

@@ -87,7 +87,12 @@ Mọi lỗi trả về `{ message, code?, field? }`. Route `/api/me/*`, `/api/ai
 | DELETE | `/api/me/notebook/:entryId` | bỏ lưu |
 | POST | `/api/me/notebook/:entryId/favorite` · `/review` | yêu thích / lật thẻ |
 | POST | `/api/ai/chat` | `{ messages: [{ role, text }] }` → stream SSE của Gemini (header `X-AI-Model` cho biết model đã trả lời). Lỗi: `ai-busy` (mọi model quá tải), `ai-quota`, `ai-key`, `ai-model` |
-| POST | `/api/speech/assess` | multipart `audio`, `itemId` → `{ score, transcript?, words? }` |
+| POST | `/api/speech/assess` | multipart `audio`, `itemId` → `{ score, transcript?, words?, comment?, engine: 'ai'\|'native' }` |
+| POST | `/api/auth/microsoft` | `{ idToken }` (MSAL) → `{ token, user }`; không gộp vào tài khoản mật khẩu có sẵn cùng email |
+| GET / POST | `/api/me/support` · `/support/unread` | hội thoại của người học với quản trị viên |
+| GET | `/api/admin/overview` · `/admin/users?q=&page=` | (admin) số liệu, danh sách người dùng |
+| PATCH / DELETE | `/api/admin/users/:id` | (admin) `{ role }` · xoá tài khoản (không áp dụng với chính mình / admin khác) |
+| GET / POST | `/api/admin/support` · `/admin/support/:userId` | (admin) hộp thư hỗ trợ, trả lời |
 
 ## Bảo mật đã có
 

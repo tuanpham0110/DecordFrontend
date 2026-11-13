@@ -8,10 +8,10 @@
  */
 import { request } from '../api.js';
 
-/** Rating band for a similarity %. */
-export function band(score) {
-    if (score >= 85) return { key: 'good', label: 'Rất giống người bản địa', tone: 'ok' };
-    if (score >= 65) return { key: 'ok', label: 'Khá giống, cần chỉnh nhẹ', tone: 'mid' };
+/** Rating band for a similarity %. `engine`: 'native' (pronunciation service) | 'ai' (AI estimate). */
+export function band(score, engine = 'native') {
+    if (score >= 85) return { key: 'good', label: engine === 'ai' ? 'Rất khớp với câu mẫu' : 'Rất giống người bản địa', tone: 'ok' };
+    if (score >= 65) return { key: 'ok', label: engine === 'ai' ? 'Khá khớp, cần chỉnh nhẹ' : 'Khá giống, cần chỉnh nhẹ', tone: 'mid' };
     return { key: 'again', label: 'Cần luyện thêm', tone: 'bad' };
 }
 

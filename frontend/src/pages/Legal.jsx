@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui.jsx';
+import { CONTACT_EMAIL } from '../data/contact.js';
 
 const UPDATED = '14/11/2026';
 
@@ -72,6 +73,15 @@ export function Terms() {
                 Khi điều khoản thay đổi, bản mới sẽ được đăng tại trang này kèm ngày cập nhật. Việc tiếp tục sử dụng dịch vụ đồng nghĩa với việc bạn chấp nhận bản
                 điều khoản mới. Xem thêm <Link to="/bao-mat" className="link">Chính sách bảo mật</Link>.
             </p>
+
+            <h3>8. Liên hệ</h3>
+            <p>
+                Mọi thắc mắc về dịch vụ, xin gửi về{' '}
+                <a href={`mailto:${CONTACT_EMAIL}`} className="link">
+                    {CONTACT_EMAIL}
+                </a>{' '}
+                hoặc nhắn cho quản trị viên trong mục Hỗ trợ sau khi đăng nhập.
+            </p>
         </LegalPage>
     );
 }
@@ -95,8 +105,8 @@ export function Privacy() {
 
             <h3>2. Ghi âm khi luyện nói</h3>
             <p>
-                Bản ghi âm ở phần Shadowing được giữ trong trình duyệt để bạn nghe lại và tự so sánh. Bản ghi chỉ được gửi lên máy chủ khi bạn chủ động bấm “So sánh
-                với người bản địa” (nếu tính năng này đang bật), và không được lưu lại sau khi chấm.
+                Bản ghi âm ở phần Shadowing được giữ trong trình duyệt để bạn nghe lại và tự so sánh. Bản ghi chỉ được gửi lên máy chủ khi bạn chủ động bấm nút chấm
+                phát âm; khi đó nó được chuyển tới mô hình Google Gemini để chép lại những gì nghe được, và không được lưu lại sau khi chấm.
             </p>
 
             <h3>3. Bên thứ ba</h3>
@@ -127,7 +137,11 @@ export function Privacy() {
 
             <h3>7. Liên hệ</h3>
             <p>
-                Nếu có câu hỏi về dữ liệu cá nhân, hãy liên hệ nhóm quản trị MUONGLAB. Xem thêm <Link to="/dieu-khoan" className="link">Điều khoản sử dụng</Link>.
+                Nếu có câu hỏi về dữ liệu cá nhân, hãy viết cho quản trị viên MUONGLAB qua{' '}
+                <a href={`mailto:${CONTACT_EMAIL}`} className="link">
+                    {CONTACT_EMAIL}
+                </a>
+                , hoặc nhắn trong mục Hỗ trợ sau khi đăng nhập. Xem thêm <Link to="/dieu-khoan" className="link">Điều khoản sử dụng</Link>.
             </p>
         </LegalPage>
     );

@@ -123,7 +123,7 @@ const del = (p, body, o) => request('DELETE', p, { ...o, body });
 
 /* ───────────── Auth ───────────── */
 export const auth = {
-    /** The signed-in user ({ id, name, email }) or null. */
+    /** The signed-in user ({ id, name, email, role }) or null. */
     currentSession() {
         return session()?.user ?? null;
     },
@@ -140,6 +140,11 @@ export const auth = {
     /** Sign in / sign up with the ID token from Google Identity Services. Returns the user. */
     async google(credential) {
         return openSession(await post('/auth/google', { credential }, { auth: false }), true);
+    },
+
+    /** Sign in / sign up with the ID token from the Microsoft (MSAL) popup. Returns the user. */
+    async microsoft(idToken) {
+        return openSession(await post('/auth/microsoft', { idToken }, { auth: false }), true);
     },
 
     /**
@@ -198,6 +203,14 @@ export const auth = {
     /* ── signed-in account ── */
     /** { id, name, email, createdAt, hasPassword, google, verified, dailyGoal } */
     me: () => get('/auth/me'),
+
+    /** Re-reads name / role from the server so a stored session never shows stale rights. */
+    async refresh() {
+        const { id, name, email, role } = await get('/auth/me');
+        const user = { id, name, email, role };
+        patchSession({ user });
+        return user;
+    },
 
     async updateProfile({ name }) {
         const user = await patch('/auth/me', { name });
@@ -267,13 +280,36 @@ export const notebook = {
     markCard: (id, known) => post(`${E(id)}/review`, { known }),
 };
 
+/* ───────────── Support (learner ↔ admin messages) ───────────── */
+export const support = {
+    /** [{ id, fromAdmin, body, at, read }] – opening it marks the admin's replies as read. */
+    thread: () => get('/me/support'),
+    send: (body) => post('/me/support', { body }),
+};
+
+/* ───────────── Admin area (role = admin) ───────────── */
+export const admin = {
+    overview: () => get('/admin/overview'),
+    users: ({ q, page } = {}) => {
+        const p = new URLSearchParams();
+        if (q) p.set('q', q);
+        if (page > 1) p.set('page', page);
+        return get(`/admin/users?${p}`);
+    },
+    setRole: (id, role) => patch(`/admin/users/${id}`, { role }),
+    deleteUser: (id) => del(`/admin/users/${id}`),
+    threads: () => get('/admin/support'),
+    thread: (userId) => get(`/admin/support/${userId}`),
+    reply: (userId, body) => post(`/admin/support/${userId}`, { body }),
+};
+
 /* ───────────── Server capabilities ───────────── */
 let metaPromise = null;
 /** { ai, aiModel, speech, mail, emailVerification, passwordReset, googleClientId } – what the backend has configured. */
 export function getMeta() {
     metaPromise ??= get('/meta', { auth: false }).catch(() => {
         metaPromise = null;
-        return { ai: false, aiModel: null, speech: false, mail: false, emailVerification: true, passwordReset: true, googleClientId: null };
+        return { ai: false, aiModel: null, speech: false, speechEngine: null, mail: false, emailVerification: true, passwordReset: true, googleClientId: null, microsoftClientId: null, supportEmail: null };
     });
     return metaPromise;
 }

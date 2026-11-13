@@ -45,6 +45,11 @@ const schema = z.object({
 
     // "Đăng nhập bằng Google" – OAuth Client ID (Web) from Google Cloud Console. Empty = button hidden.
     GOOGLE_CLIENT_ID: z.string().optional(),
+    // "Đăng nhập bằng Microsoft" – Application (client) ID of an Entra ID app registration (SPA platform)
+    MICROSOFT_CLIENT_ID: z.string().optional(),
+
+    // shown on the contact / legal pages and receives "new support message" notices
+    SUPPORT_EMAIL: z.string().default('phamductuan01102005@gmail.com'),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -69,6 +74,9 @@ export const env = {
     verificationRequired: mailEnabled || !isProd,
     aiEnabled: Boolean(parsed.data.GEMINI_API_KEY),
     aiModels: [...new Set([parsed.data.GEMINI_MODEL, ...parsed.data.GEMINI_FALLBACK_MODELS.split(',')].map((m) => m.trim()).filter(Boolean))],
-    speechEnabled: Boolean(parsed.data.SPEECH_API_URL),
+    // a dedicated pronunciation service, or Gemini listening to the recording as a fallback
+    speechEnabled: Boolean(parsed.data.SPEECH_API_URL || parsed.data.GEMINI_API_KEY),
+    speechEngine: parsed.data.SPEECH_API_URL ? 'native' : parsed.data.GEMINI_API_KEY ? 'ai' : null,
     googleEnabled: Boolean(parsed.data.GOOGLE_CLIENT_ID),
+    microsoftEnabled: Boolean(parsed.data.MICROSOFT_CLIENT_ID),
 };

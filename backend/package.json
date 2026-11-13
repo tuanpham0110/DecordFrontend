@@ -16,6 +16,7 @@
         "db:seed": "prisma db seed",
         "db:reset": "prisma migrate reset",
         "db:studio": "prisma studio",
+        "admin:grant": "node --env-file-if-exists=.env scripts/grant-admin.js",
         "test": "node --env-file-if-exists=.env --test \"test/**/*.test.js\""
     },
     "prisma": {

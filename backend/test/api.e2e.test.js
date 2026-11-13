@@ -11,6 +11,8 @@ import jwt from 'jsonwebtoken';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/lib/prisma.js';
 import { resetGoogleKeyCache, verifyGoogleIdToken } from '../src/lib/google.js';
+import { resetMicrosoftKeyCache, verifyMicrosoftIdToken } from '../src/lib/microsoft.js';
+import { compare } from '../src/modules/speech/speech.routes.js';
 import { publicItem } from '../src/modules/learning/rules.js';
 import { ITEMS } from '../prisma/data/content.js';
 
@@ -238,6 +240,72 @@ describe('account', () => {
     });
 });
 
+describe('admin + support inbox', () => {
+    const adminEmail = `admin-${Date.now()}@test.local`;
+    const victimEmail = `victim-${Date.now()}@test.local`;
+    let adminToken;
+    let learnerId;
+    const call = (tok) => async (method, path, body) => {
+        const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
+        return { status: res.status, data: await res.json() };
+    };
+
+    before(async () => {
+        const hash = await bcrypt.hash(password, 10);
+        await prisma.user.create({ data: { email: adminEmail, name: 'Quản Trị', passwordHash: hash, verified: true, role: 'admin' } });
+        await prisma.user.create({ data: { email: victimEmail, name: 'Người Bị Xoá', passwordHash: hash, verified: true } });
+        const r = await api('POST', '/auth/login', { email: adminEmail, password }, false);
+        adminToken = r.data.token;
+        assert.equal(r.data.user.role, 'admin');
+        learnerId = (await prisma.user.findUnique({ where: { email } })).id;
+    });
+
+    test('learners are kept out of the admin area', async () => {
+        const r = await api('GET', '/admin/overview');
+        assert.equal(r.status, 403);
+        assert.equal(r.data.code, 'admin-only');
+        assert.equal((await api('GET', '/admin/users', null, false)).status, 401);
+    });
+
+    test('a learner writes to support, the admin sees it as unread', async () => {
+        assert.equal((await api('POST', '/me/support', { body: '   ' })).status, 400);
+        const m = await api('POST', '/me/support', { body: 'Em không nghe được âm thanh ở bài 2 ạ.' });
+        assert.equal(m.status, 201);
+        assert.equal(m.data.fromAdmin, false);
+        const threads = await call(adminToken)('GET', '/admin/support');
+        const t = threads.data.find((x) => x.user.id === learnerId);
+        assert.equal(t.unread, 1);
+        assert.match(t.preview, /bài 2/);
+        assert.ok((await call(adminToken)('GET', '/admin/overview')).data.unreadMessages >= 1);
+    });
+
+    test('opening the thread marks it read; the reply reaches the learner', async () => {
+        const th = await call(adminToken)('GET', `/admin/support/${learnerId}`);
+        assert.equal(th.data.messages.length, 1);
+        assert.equal((await call(adminToken)('GET', '/admin/support')).data.find((x) => x.user.id === learnerId).unread, 0);
+        assert.equal((await call(adminToken)('POST', `/admin/support/${learnerId}`, { body: 'Bạn thử tải lại trang giúp mình nhé.' })).status, 201);
+        assert.equal((await api('GET', '/me/overview')).data.support.unread, 1);
+        const mine = await api('GET', '/me/support');
+        assert.deepEqual(mine.data.map((x) => x.fromAdmin), [false, true]);
+        assert.equal((await api('GET', '/me/support/unread')).data.unread, 0, 'reading the thread clears the badge');
+    });
+
+    test('admin: user list, search, roles and deletion rules', async () => {
+        const list = await call(adminToken)('GET', `/admin/users?q=${encodeURIComponent('victim-')}`);
+        assert.equal(list.status, 200);
+        const v = list.data.users.find((u) => u.email === victimEmail);
+        assert.ok(v);
+        const me = (await call(adminToken)('GET', `/admin/users?q=${encodeURIComponent(adminEmail)}`)).data.users[0];
+        assert.equal((await call(adminToken)('DELETE', `/admin/users/${me.id}`)).data.code, 'self');
+        assert.equal((await call(adminToken)('PATCH', `/admin/users/${me.id}`, { role: 'user' })).data.code, 'self');
+        assert.equal((await call(adminToken)('PATCH', `/admin/users/${v.id}`, { role: 'admin' })).data.role, 'admin');
+        assert.equal((await call(adminToken)('DELETE', `/admin/users/${v.id}`)).data.code, 'is-admin');
+        assert.equal((await call(adminToken)('PATCH', `/admin/users/${v.id}`, { role: 'user' })).data.role, 'user');
+        assert.equal((await call(adminToken)('DELETE', `/admin/users/${v.id}`)).status, 200);
+        assert.equal(await prisma.user.count({ where: { email: victimEmail } }), 0);
+    });
+});
+
 describe('answer options are shuffled', () => {
     const C = { ITEMS };
     const choiceIds = Object.keys(ITEMS).filter((id) => Array.isArray(ITEMS[id].options));
@@ -307,5 +375,56 @@ describe('Google ID token verification', () => {
         const r = await api('POST', '/auth/google', { credential: 'x'.repeat(40) }, false);
         assert.equal(r.status, 503);
         assert.equal(r.data.code, 'google-disabled');
+    });
+});
+
+describe('Microsoft ID token verification', () => {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'ms-key', alg: 'RS256', use: 'sig' };
+    const loadKeys = async () => ({ keys: [jwk], maxAge: 60 });
+    const TID = '11111111-2222-3333-4444-555555555555';
+    const sign = (claims = {}, opts = {}) =>
+        jwt.sign({ tid: TID, oid: 'object-1', preferred_username: 'Hoa@Contoso.com', name: 'Hoa Bùi', ...claims }, opts.key ?? privateKey, {
+            algorithm: 'RS256',
+            keyid: 'ms-key',
+            audience: opts.aud ?? 'ms-client',
+            issuer: opts.iss ?? `https://login.microsoftonline.com/${claims.tid ?? TID}/v2.0`,
+            expiresIn: opts.exp ?? '5m',
+        });
+
+    test('accepts a valid token; the identity is tenant + object id', async () => {
+        resetMicrosoftKeyCache();
+        assert.deepEqual(await verifyMicrosoftIdToken(sign(), 'ms-client', { loadKeys }), { sub: `${TID}:object-1`, email: 'hoa@contoso.com', name: 'Hoa Bùi' });
+    });
+    test('rejects wrong audience, an issuer that is not the token tenant, expiry, signer, missing email', async () => {
+        const other = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+        const bad = [sign({}, { aud: 'someone-else' }), sign({}, { iss: 'https://login.microsoftonline.com/another-tenant/v2.0' }), sign({}, { exp: '-1m' }), sign({}, { key: other }), sign({ preferred_username: 'no-email' }), 'not-a-jwt'];
+        for (const tok of bad) await assert.rejects(verifyMicrosoftIdToken(tok, 'ms-client', { loadKeys }));
+    });
+    test('the endpoint reports "disabled" when no client id is configured', async () => {
+        if (process.env.MICROSOFT_CLIENT_ID) return;
+        const r = await api('POST', '/auth/microsoft', { idToken: 'x'.repeat(40) }, false);
+        assert.equal(r.status, 503);
+        assert.equal(r.data.code, 'microsoft-disabled');
+    });
+});
+
+describe('pronunciation scoring (transcript vs model sentence)', () => {
+    test('an exact or near transcript scores high, syllable by syllable', () => {
+        assert.equal(compare('mốch, hal, pa, pổn', 'mốch hal pa pổn').score, 100);
+        const near = compare('mốch, hal, pa, pổn', 'mốc han pa pổn');
+        assert.ok(near.score >= 80 && near.score < 100, String(near.score));
+        assert.ok(near.words.every((w) => w.status === 'ok'));
+    });
+    test('missing syllables are marked and cost points', () => {
+        const r = compare('mốch, hal, pa, pổn', 'mốch hal');
+        assert.equal(r.score, 50);
+        assert.deepEqual(r.words.map((w) => w.status), ['ok', 'ok', 'miss', 'miss']);
+        assert.match(r.comment, /pa/);
+    });
+    test('a different sentence or silence cannot pass', () => {
+        assert.ok(compare('ếm', 'good morning everyone').score < 30);
+        assert.equal(compare('ếm', '').score, 0);
+        assert.ok(compare('mốch, hal, pa, pổn', 'xin chào tất cả mọi người').score < 50);
     });
 });

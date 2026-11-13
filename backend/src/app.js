@@ -11,6 +11,7 @@ import { contentRoutes } from './modules/content/content.routes.js';
 import { learningRoutes } from './modules/learning/learning.routes.js';
 import { aiRoutes } from './modules/ai/ai.routes.js';
 import { speechRoutes } from './modules/speech/speech.routes.js';
+import { adminRoutes } from './modules/admin/admin.routes.js';
 
 export function createApp() {
     const app = express();
@@ -53,10 +54,13 @@ export function createApp() {
             ai: env.aiEnabled,
             aiModel: env.aiEnabled ? env.GEMINI_MODEL : null,
             speech: env.speechEnabled,
+            speechEngine: env.speechEngine, // 'native' (pronunciation service) | 'ai' (Gemini estimate) | null
             mail: env.mailEnabled,
             emailVerification: env.verificationRequired,
             passwordReset: env.mailEnabled || !env.isProd,
             googleClientId: env.GOOGLE_CLIENT_ID || null,
+            microsoftClientId: env.MICROSOFT_CLIENT_ID || null,
+            supportEmail: env.SUPPORT_EMAIL || null,
         });
     });
 
@@ -66,6 +70,7 @@ export function createApp() {
     app.use('/api/me', learningRoutes);
     app.use('/api/ai', aiRoutes);
     app.use('/api/speech', speechRoutes);
+    app.use('/api/admin', adminRoutes);
 
     app.use('/api', notFoundRoute);
     app.use(errorHandler);

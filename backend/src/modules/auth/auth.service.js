@@ -7,8 +7,9 @@ import { signAccess, signReset, verifyToken } from '../../lib/jwt.js';
 import { sendOtpMail } from '../../lib/mailer.js';
 import { logger } from '../../lib/logger.js';
 import { verifyGoogleIdToken } from '../../lib/google.js';
+import { verifyMicrosoftIdToken } from '../../lib/microsoft.js';
 
-const publicUser = (u) => ({ id: u.id, name: u.name, email: u.email });
+const publicUser = (u) => ({ id: u.id, name: u.name, email: u.email, role: u.role });
 const normEmail = (e) => e.trim().toLowerCase();
 const session = (user, remember = false) => ({ token: signAccess(user.id, remember), user: publicUser(user) });
 const hashPassword = (password) => bcrypt.hash(password, 10);
@@ -111,6 +112,32 @@ export const authService = {
         return session(user, true);
     },
 
+    /**
+     * "Đăng nhập bằng Microsoft". Unlike Google, Microsoft does not guarantee that the email in the
+     * token was verified, so an existing password account is never taken over through it: the
+     * Microsoft identity is only linked to accounts it created itself.
+     */
+    async microsoftLogin({ idToken }) {
+        if (!env.microsoftEnabled) throw unavailable('Đăng nhập bằng Microsoft chưa được bật trên máy chủ.', { code: 'microsoft-disabled' });
+        let m;
+        try {
+            m = await verifyMicrosoftIdToken(idToken, env.MICROSOFT_CLIENT_ID);
+        } catch (e) {
+            logger.warn('Microsoft sign-in rejected:', e.message);
+            throw unauthorized('Không xác minh được tài khoản Microsoft. Vui lòng thử lại.', { code: 'microsoft-invalid' });
+        }
+        let user = await prisma.user.findUnique({ where: { microsoftSub: m.sub } });
+        if (!user) {
+            if (await prisma.user.findUnique({ where: { email: m.email } })) {
+                throw badRequest('Email này đã có tài khoản MUONGLAB. Hãy đăng nhập bằng mật khẩu (hoặc Google) của tài khoản đó.', { code: 'email-taken' });
+            }
+            user = await prisma.user.create({
+                data: { name: m.name, email: m.email, microsoftSub: m.sub, verified: true, passwordSet: false, passwordHash: await hashPassword(crypto.randomBytes(32).toString('hex')) },
+            });
+        }
+        return session(user, true);
+    },
+
     /** Always answers the same way so the endpoint can't be used to probe which emails exist. */
     async forgotPassword({ email }) {
         if (!env.mailEnabled && env.isProd) {
@@ -158,7 +185,7 @@ export const authService = {
     /* ───── Signed-in account ───── */
     async me(userId) {
         const u = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
-        return { ...publicUser(u), createdAt: u.createdAt.getTime(), hasPassword: u.passwordSet, google: !!u.googleSub, verified: u.verified, dailyGoal: u.dailyGoal };
+        return { ...publicUser(u), createdAt: u.createdAt.getTime(), hasPassword: u.passwordSet, google: !!u.googleSub, microsoft: !!u.microsoftSub, verified: u.verified, dailyGoal: u.dailyGoal };
     },
 
     async updateProfile(userId, { name }) {

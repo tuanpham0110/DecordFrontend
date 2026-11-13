@@ -4,6 +4,7 @@ import { Button, TextField } from '../../components/ui.jsx';
 import Icon from '../../components/Icon.jsx';
 import { auth } from '../../services/api.js';
 import useMeta from '../../hooks/useMeta.js';
+import { CONTACT_EMAIL } from '../../data/contact.js';
 import { FormAlert, isEmail } from './shared.jsx';
 
 export default function ForgotPassword() {
@@ -43,7 +44,7 @@ export default function ForgotPassword() {
             </div>
             <form className="auth-form" onSubmit={onSubmit} noValidate>
                 {unavailable && (
-                    <FormAlert>Máy chủ chưa bật gửi email nên chưa thể đặt lại mật khẩu lúc này. Vui lòng liên hệ quản trị viên để được hỗ trợ.</FormAlert>
+                    <FormAlert>Máy chủ chưa bật gửi email nên chưa thể đặt lại mật khẩu lúc này. Vui lòng liên hệ quản trị viên qua {CONTACT_EMAIL} để được hỗ trợ.</FormAlert>
                 )}
                 <TextField
                     label="Email"

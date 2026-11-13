@@ -53,6 +53,16 @@ function UserMenu() {
                         <Icon name="calendar" size={18} />
                         Lịch sử học
                     </Link>
+                    <Link role="menuitem" to="/ho-tro" className="user-menu__item">
+                        <Icon name="mail" size={18} />
+                        Hỗ trợ
+                    </Link>
+                    {user?.role === 'admin' && (
+                        <Link role="menuitem" to="/quan-tri" className="user-menu__item user-menu__item--admin">
+                            <Icon name="dashboard" size={18} />
+                            Quản trị
+                        </Link>
+                    )}
                     <button role="menuitem" className="user-menu__item user-menu__item--danger" onClick={logout}>
                         <Icon name="logout" size={18} />
                         Đăng xuất
@@ -80,6 +90,8 @@ export default function AppLayout() {
     }, [location.pathname]);
 
     const due = info?.review.due ?? 0;
+    const badges = { due, support: info?.support?.unread ?? 0 };
+    const badgeLabel = { due: 'câu đến hạn ôn', support: 'tin nhắn mới từ quản trị viên' };
     const today = info?.stats.today;
     const focus = info?.resume
         ? { id: info.resume.lessonId, title: info.resume.title, label: `Câu ${info.resume.done + 1}/${info.resume.total} · ${info.resume.part}`, pct: (info.resume.done / info.resume.total) * 100, cta: 'Học tiếp' }
@@ -101,9 +113,9 @@ export default function AppLayout() {
                                 <NavLink key={item.to} to={item.to} className="sidebar__link">
                                     <Icon name={item.icon} size={20} />
                                     <span>{item.label}</span>
-                                    {item.badge === 'due' && due > 0 && (
-                                        <span className="sidebar__badge" aria-label={`${due} câu đến hạn ôn`}>
-                                            {due > 9 ? '9+' : due}
+                                    {item.badge && badges[item.badge] > 0 && (
+                                        <span className="sidebar__badge" aria-label={`${badges[item.badge]} ${badgeLabel[item.badge]}`}>
+                                            {badges[item.badge] > 9 ? '9+' : badges[item.badge]}
                                         </span>
                                     )}
                                 </NavLink>
