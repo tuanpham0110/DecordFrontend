@@ -87,7 +87,8 @@ function ReviewQueue() {
                 <div>
                     <h2>{due.length ? `${due.length} câu đến hạn ôn` : 'Bạn đã ôn hết câu đến hạn'}</h2>
                     <p>
-                        Ôn đúng một câu, hệ thống sẽ giãn lịch ôn lần sau (1 → 3 → 7 ngày). Đúng 4 lần liên tiếp là thuộc. Sai thì câu quay về ôn ngay.
+                        Ôn đúng một câu khi đến hạn, hệ thống sẽ giãn lịch ôn lần sau (1 → 3 → 7 ngày). Đúng 4 lần liên tiếp là thuộc. Sai thì câu quay về ôn
+                        ngay. Ôn trước hạn chỉ để luyện thêm, không rút ngắn lịch.
                     </p>
                     <div className="rq__stats">
                         <span>
@@ -104,7 +105,7 @@ function ReviewQueue() {
                     </Button>
                 ) : (
                     active.length > 0 && (
-                        <Button to={`/on-luyen/phien?items=${active.map((c) => c.itemId).join(',')}`} size="lg" variant="light" iconLeft="refresh">
+                        <Button to="/on-luyen/phien?scope=all" size="lg" variant="light" iconLeft="refresh">
                             Ôn trước hạn
                         </Button>
                     )

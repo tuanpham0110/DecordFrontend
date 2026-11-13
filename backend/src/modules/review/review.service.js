@@ -1,7 +1,7 @@
 import { prisma } from '../../lib/prisma.js';
 import { badRequest, notFound } from '../../lib/errors.js';
 import { getContent } from '../content/content.service.js';
-import { gradeResponse, itemLabel, publicItem, revealed, scheduleCard } from '../learning/rules.js';
+import { gradeResponse, isEarlyReview, itemLabel, publicItem, revealed, scheduleCard } from '../learning/rules.js';
 import { bumpDaily, toCard } from '../learning/state.js';
 import { learnerTransaction } from '../learning/transaction.js';
 import { assertReviewToken, reviewToken } from './token.js';
@@ -44,7 +44,10 @@ export const reviewService = {
             } else {
                 correct = gradeResponse(item, response);
             }
-            const card = scheduleCard(toCard(row), correct);
+            const before = toCard(row);
+            // practised before the due date: counted as activity, but the schedule does not move up
+            const early = correct && isEarlyReview(before);
+            const card = scheduleCard(before, correct);
             await tx.reviewCard.update({
                 where: { userId_itemId: { userId, itemId } },
                 data: {
@@ -59,7 +62,7 @@ export const reviewService = {
             });
             await tx.user.update({ where: { id: userId }, data: { reviewDone: { increment: 1 } } });
             await bumpDaily(tx, userId, { answered: 1, correct: correct ? 1 : 0 });
-            return { correct, box: card.box, mastered: card.mastered, due: card.due, ...revealed(C, itemId) };
+            return { correct, early, box: card.box, mastered: card.mastered, due: card.due, ...revealed(C, itemId) };
         });
     },
 };

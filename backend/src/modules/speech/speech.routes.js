@@ -88,13 +88,17 @@ async function transcribe(file) {
         generationConfig: { temperature: 0, maxOutputTokens: 1024, responseMimeType: 'application/json', responseSchema: TRANSCRIBE_SCHEMA },
     };
     let last = null;
+    // the whole chain must answer before the browser gives up (40s) and well inside the function's 60s limit
+    const deadline = Date.now() + 36_000;
     for (const model of env.aiModels) {
+        const left = deadline - Date.now();
+        if (left < 4_000) break;
         try {
             const res = await fetch(`${GEMINI}/${encodeURIComponent(model)}:generateContent`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
                 body: JSON.stringify(payload),
-                signal: AbortSignal.timeout(20_000),
+                signal: AbortSignal.timeout(Math.min(20_000, left)),
             });
             if (!res.ok) throw Object.assign(new Error(`Gemini ${res.status}`), { status: res.status, body: await res.text().catch(() => '') });
             const data = await res.json();

@@ -10,7 +10,7 @@
         "db:seed": "npm --prefix backend run db:seed",
         "dev:api": "npm --prefix backend run dev",
         "dev:web": "npm --prefix frontend run dev",
-        "test": "npm --prefix backend test",
+        "test": "npm --prefix backend test && npm --prefix frontend test",
         "build": "npm --prefix frontend run build"
     }
 }

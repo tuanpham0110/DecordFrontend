@@ -232,7 +232,7 @@ test('BUG-006 queue labels hide build answer and listen-pick target before submi
     assert.ok(queue.every((c) => c.item.answer === undefined));
 });
 
-test('BUG-012 duplicate review token cannot schedule twice, reopening allows early review', async () => {
+test('BUG-012 duplicate review token cannot schedule twice, early review practises without moving the schedule', async () => {
     await learningService.startLesson('learner', 1);
     await learningService.answer('learner', 1, 'l1-ep-em', 'wrong');
     const [card] = await reviewService.queue('learner');
@@ -245,10 +245,21 @@ test('BUG-012 duplicate review token cannot schedule twice, reopening allows ear
     assert.equal(db.user.reviewDone, 1);
     assert.equal(db.cards.get(card.itemId).box, 2);
     await assert.rejects(reviewService.answer('learner', card.itemId, ITEMS[card.itemId].answer), { code: 'review-stale' });
+    // the card is now due tomorrow: answering it again today is practice, not a spaced recall
+    const dueAfterFirst = new Date(db.cards.get(card.itemId).due).getTime();
+    assert.ok(dueAfterFirst > Date.now());
     const [next] = await reviewService.queue('learner', { itemIds: [card.itemId] });
-    await reviewService.answer('learner', next.itemId, ITEMS[next.itemId].answer, next.reviewToken);
-    assert.equal(db.cards.get(card.itemId).box, 3);
+    const early = await reviewService.answer('learner', next.itemId, ITEMS[next.itemId].answer, next.reviewToken);
+    assert.equal(early.early, true);
+    assert.equal(db.cards.get(card.itemId).box, 2);
+    assert.equal(new Date(db.cards.get(card.itemId).due).getTime(), dueAfterFirst);
     assert.equal(db.user.reviewDone, 2);
+    // the early answer still used up its token, and a wrong early answer sends the card back to box 1
+    await assert.rejects(reviewService.answer('learner', next.itemId, ITEMS[next.itemId].answer, next.reviewToken), { code: 'review-stale' });
+    const [again] = await reviewService.queue('learner', { itemIds: [card.itemId] });
+    const wrong = await reviewService.answer('learner', again.itemId, 'wrong', again.reviewToken);
+    assert.equal(wrong.early, false);
+    assert.equal(db.cards.get(card.itemId).box, 1);
 });
 
 test('BUG-012 a token cannot be used for another learner/card or changed signature', async () => {

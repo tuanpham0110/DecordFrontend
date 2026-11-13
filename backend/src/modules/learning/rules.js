@@ -213,8 +213,22 @@ export function streakOf(data) {
     return n;
 }
 
-/** Mutates and returns the card after a review answer. */
+/** A card answered before its due date is being practised early, not recalled after the interval. */
+export const isEarlyReview = (card, now = Date.now()) => !card.mastered && card.due != null && card.due > now;
+
+/**
+ * Mutates and returns the card after a review answer.
+ * A correct answer only moves the card up a box once its interval has passed: otherwise four quick
+ * answers in one sitting would mark a card "mastered" and the spacing (1 → 3 → 7 days) would mean
+ * nothing. Early practice is recorded but keeps the box and the due date; a wrong answer always
+ * sends the card back to box 1.
+ */
 export function scheduleCard(card, correct, now = Date.now()) {
+    if (correct && isEarlyReview(card, now)) {
+        card.lastAt = now;
+        card.lastCorrect = true;
+        return card;
+    }
     if (correct) {
         card.box = Math.min(MASTERED_BOX, card.box + 1);
         card.right += 1;

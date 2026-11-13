@@ -14,7 +14,9 @@ export default function ReviewSession() {
     const navigate = useNavigate();
     const toast = useToast();
     const ids = (params.get('items') || '').split(',').filter(Boolean);
-    const { data, error, loading, reload } = useAsync(() => review.queue(ids.length ? { itemIds: ids } : { scope: 'due' }), [params.get('items')]);
+    // ?scope=all = "Ôn trước hạn": every card still being learned, without a long list of ids in the URL
+    const scope = params.get('scope') === 'all' ? 'all' : 'due';
+    const { data, error, loading, reload } = useAsync(() => review.queue(ids.length ? { itemIds: ids } : { scope }), [params.get('items'), scope]);
     const [i, setI] = useState(0);
     const [log, setLog] = useState([]);
 
@@ -53,6 +55,8 @@ export default function ReviewSession() {
 
     const done = i >= data.length;
     const card = data[i];
+    // not due yet: a correct answer is extra practice and leaves the schedule alone (the server decides)
+    const early = !done && card.due != null && card.due > Date.now();
 
     return shell(
         <>
@@ -79,7 +83,7 @@ export default function ReviewSession() {
                             <li key={l.itemId}>
                                 <Icon name={l.correct ? 'check-circle' : 'x-circle'} size={18} className={l.correct ? 'ok' : 'bad'} />
                                 <span>{l.label}</span>
-                                <small>{l.mastered ? 'Đã thuộc' : formatDue(l.due)}</small>
+                                <small>{l.mastered ? 'Đã thuộc' : l.early ? `Luyện thêm · ${formatDue(l.due)}` : formatDue(l.due)}</small>
                             </li>
                         ))}
                     </ul>
@@ -96,6 +100,7 @@ export default function ReviewSession() {
                 <>
                     <p className="review-origin">
                         <Icon name="refresh" size={14} /> Câu từ Bài {card.lessonId} · bạn đã sai {card.wrong} lần
+                        {early && ' · ôn trước hạn: trả lời đúng không đổi lịch ôn, trả lời sai thì ôn lại từ đầu'}
                     </p>
                     <ExerciseStage
                         key={card.itemId}
@@ -108,8 +113,9 @@ export default function ReviewSession() {
                             return r;
                         }}
                         onRate={async (rating) => {
-                            // re-tapping another rating must not reschedule the card a second time
-                            if (log.some((l) => l.itemId === card.itemId)) return;
+                            // re-tapping another rating must not reschedule the card a second time –
+                            // and must not look as if the new rating had been saved
+                            if (log.some((l) => l.itemId === card.itemId)) throw new Error('Đánh giá cho câu này đã được ghi nhận. Bấm “Câu tiếp” để ôn câu sau.');
                             const r = await review.answer(card.itemId, rating, card.reviewToken);
                             setLog((x) => [...x, { itemId: card.itemId, label: card.label, ...r }]);
                         }}
