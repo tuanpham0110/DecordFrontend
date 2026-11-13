@@ -11,6 +11,7 @@ const TIMEOUT = 15000;
 
 const SESSION_KEY = 'muonglab.session';
 const PENDING_KEY = 'muonglab.pending';
+export const CHAT_KEY = 'muonglab.chat';
 export const UNAUTHORIZED_EVENT = 'muonglab:unauthorized';
 
 export class ApiError extends Error {
@@ -46,6 +47,21 @@ function session() {
 function clearSession() {
     write(localStorage, SESSION_KEY, null);
     write(sessionStorage, SESSION_KEY, null);
+    write(sessionStorage, CHAT_KEY, null); // the AI chat belongs to the account that just left
+}
+/** Stores a fresh session; `remember` keeps it across browser restarts. */
+function openSession({ token, user }, remember) {
+    clearSession();
+    write(remember ? localStorage : sessionStorage, SESSION_KEY, { token, user });
+    write(localStorage, PENDING_KEY, null);
+    return user;
+}
+/** Updates the stored session in place (same storage it already lives in). */
+function patchSession(patch) {
+    for (const store of [localStorage, sessionStorage]) {
+        const cur = read(store, SESSION_KEY);
+        if (cur) write(store, SESSION_KEY, { ...cur, ...patch });
+    }
 }
 export const authToken = () => session()?.token ?? null;
 
@@ -103,7 +119,7 @@ const get = (p, o) => request('GET', p, o);
 const post = (p, body, o) => request('POST', p, { ...o, body: body ?? {} });
 const put = (p, body, o) => request('PUT', p, { ...o, body });
 const patch = (p, body, o) => request('PATCH', p, { ...o, body });
-const del = (p, o) => request('DELETE', p, o);
+const del = (p, body, o) => request('DELETE', p, { ...o, body });
 
 /* ───────────── Auth ───────────── */
 export const auth = {
@@ -114,21 +130,27 @@ export const auth = {
 
     async login({ email, password, remember }) {
         try {
-            const { token, user } = await post('/auth/login', { email: email.trim(), password, remember: !!remember }, { auth: false });
-            clearSession();
-            write(remember ? localStorage : sessionStorage, SESSION_KEY, { token, user });
-            write(localStorage, PENDING_KEY, null);
-            return user;
+            return openSession(await post('/auth/login', { email: email.trim(), password, remember: !!remember }, { auth: false }), remember);
         } catch (e) {
             if (e.code === 'unverified') write(localStorage, PENDING_KEY, { email: email.trim(), purpose: 'verify' });
             throw e;
         }
     },
 
+    /** Sign in / sign up with the ID token from Google Identity Services. Returns the user. */
+    async google(credential) {
+        return openSession(await post('/auth/google', { credential }, { auth: false }), true);
+    },
+
+    /**
+     * Creates the account. Returns { user } when the server signs the learner in right away
+     * (email verification off), otherwise { user: null } and an OTP is waiting to be entered.
+     */
     async register({ name, email, password }) {
         const r = await post('/auth/register', { name, email: email.trim(), password }, { auth: false });
+        if (r.session) return { user: openSession(r.session, true) };
         write(localStorage, PENDING_KEY, { email: r.email, purpose: 'verify' });
-        return r;
+        return { user: null };
     },
 
     async requestReset({ email }) {
@@ -149,13 +171,16 @@ export const auth = {
         return true;
     },
 
+    /** Confirms the OTP. For sign-up the learner is signed in: returns { purpose: 'verify', user }. */
     async verifyOtp({ code }) {
         const p = auth.pending();
         if (!p) throw new ApiError('Phiên xác thực đã hết hạn. Vui lòng thực hiện lại.');
         const r = await post('/auth/otp/verify', { email: p.email, purpose: p.purpose, code }, { auth: false });
-        if (p.purpose === 'reset') write(localStorage, PENDING_KEY, { ...p, verified: true, resetToken: r.resetToken });
-        else write(localStorage, PENDING_KEY, null);
-        return p;
+        if (p.purpose === 'reset') {
+            write(localStorage, PENDING_KEY, { ...p, verified: true, resetToken: r.resetToken });
+            return { purpose: 'reset', user: null };
+        }
+        return { purpose: 'verify', user: r.token ? openSession(r, true) : null };
     },
 
     async resetPassword({ password }) {
@@ -168,6 +193,29 @@ export const auth = {
 
     logout() {
         clearSession();
+    },
+
+    /* ── signed-in account ── */
+    /** { id, name, email, createdAt, hasPassword, google, verified, dailyGoal } */
+    me: () => get('/auth/me'),
+
+    async updateProfile({ name }) {
+        const user = await patch('/auth/me', { name });
+        patchSession({ user });
+        return user;
+    },
+
+    /** Other devices are signed out; this one keeps working with the new token. */
+    async changePassword({ currentPassword, newPassword }) {
+        const { token, user } = await post('/auth/password/change', { currentPassword: currentPassword || undefined, newPassword });
+        patchSession({ token, user });
+        return user;
+    },
+
+    async deleteAccount({ password, confirmEmail }) {
+        await del('/auth/me', { password: password || undefined, confirmEmail: confirmEmail || undefined });
+        clearSession();
+        return true;
     },
 };
 
@@ -221,11 +269,11 @@ export const notebook = {
 
 /* ───────────── Server capabilities ───────────── */
 let metaPromise = null;
-/** { ai, aiModel, speech, mail } – which optional services the backend has configured. */
+/** { ai, aiModel, speech, mail, emailVerification, passwordReset, googleClientId } – what the backend has configured. */
 export function getMeta() {
     metaPromise ??= get('/meta', { auth: false }).catch(() => {
         metaPromise = null;
-        return { ai: false, aiModel: null, speech: false, mail: false };
+        return { ai: false, aiModel: null, speech: false, mail: false, emailVerification: true, passwordReset: true, googleClientId: null };
     });
     return metaPromise;
 }

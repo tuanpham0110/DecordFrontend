@@ -4,6 +4,7 @@ import { Button } from '../../components/ui.jsx';
 import Icon from '../../components/Icon.jsx';
 import { auth } from '../../services/api.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { FormAlert, maskEmail } from './shared.jsx';
 
 const LEN = 6;
@@ -62,8 +63,10 @@ export default function VerifyOtp() {
     const navigate = useNavigate();
     const location = useLocation();
     const toast = useToast();
+    const { verifyOtp } = useAuth();
     const [pending] = useState(() => auth.pending());
     const [code, setCode] = useState('');
+    const [resending, setResending] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [left, setLeft] = useState(COOLDOWN);
@@ -86,9 +89,13 @@ export default function VerifyOtp() {
         setLoading(true);
         setError('');
         try {
-            await auth.verifyOtp({ code });
+            const r = await verifyOtp({ code });
             if (isReset) navigate('/dat-lai-mat-khau', { replace: true });
-            else {
+            else if (r.user) {
+                // signed in – go straight to where the learner was heading
+                toast(`Xác thực thành công. Chào mừng ${r.user.name}!`);
+                navigate(location.state?.from || '/tong-quan', { replace: true });
+            } else {
                 toast('Xác thực thành công. Mời bạn đăng nhập.');
                 navigate('/dang-nhap', { replace: true, state: { from: location.state?.from, verified: true } });
             }
@@ -101,9 +108,20 @@ export default function VerifyOtp() {
     }
 
     async function resend() {
-        await auth.resendOtp();
-        setLeft(COOLDOWN);
-        toast('Đã gửi lại mã xác thực.');
+        if (resending) return;
+        setResending(true);
+        setError('');
+        try {
+            await auth.resendOtp();
+            setCode('');
+            setLeft(COOLDOWN);
+            toast('Đã gửi lại mã xác thực.');
+        } catch (err) {
+            // e.g. "Vui lòng đợi 42 giây…" from the server-side cooldown
+            setError(err.message);
+        } finally {
+            setResending(false);
+        }
     }
 
     return (
@@ -113,7 +131,7 @@ export default function VerifyOtp() {
                 Quay lại
             </Link>
             <div className="auth-head">
-                <h1>Xác thực tài khoản</h1>
+                <h1>{isReset ? 'Nhập mã xác thực' : 'Xác thực tài khoản'}</h1>
                 <p>
                     Chúng tôi đã gửi mã xác thực (OTP) đến <strong>{maskEmail(pending.email)}</strong>. Vui lòng nhập mã để{' '}
                     {isReset ? 'tiếp tục đặt lại mật khẩu' : 'hoàn tất xác thực'}.
@@ -132,7 +150,7 @@ export default function VerifyOtp() {
                 <FormAlert>{error}</FormAlert>
                 <p className="otp__resend">
                     Bạn không nhận được mã?{' '}
-                    <button type="button" className="link" onClick={resend} disabled={left > 0}>
+                    <button type="button" className="link" onClick={resend} disabled={left > 0 || resending}>
                         {left > 0 ? `Gửi lại (${left}s)` : 'Gửi lại'}
                     </button>
                 </p>

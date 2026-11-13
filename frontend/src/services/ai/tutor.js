@@ -15,7 +15,7 @@ export async function askTutor(messages, { onToken, signal } = {}) {
         body: { messages: messages.filter((m) => m.text?.trim()).map(({ role, text }) => ({ role, text })) },
         raw: true,
         signal,
-        timeout: 30000,
+        timeout: 45000, // the server may walk through fallback models before the first token
     });
 
     const reader = res.body.getReader();

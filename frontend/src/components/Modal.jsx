@@ -4,20 +4,25 @@ import Icon from './Icon.jsx';
 
 export default function Modal({ open, onClose, title, children, footer }) {
     const ref = useRef(null);
+    // callers usually pass an inline `onClose`; keeping it in a ref stops the effect below from
+    // re-running (and stealing focus from an input inside the dialog) on every parent render
+    const closeRef = useRef(onClose);
+    closeRef.current = onClose;
 
     useEffect(() => {
         if (!open) return;
         const prev = document.activeElement;
-        const onKey = (e) => e.key === 'Escape' && onClose();
+        const onKey = (e) => e.key === 'Escape' && closeRef.current();
         document.addEventListener('keydown', onKey);
         document.body.style.overflow = 'hidden';
-        ref.current?.focus();
+        // leave focus where an autoFocus field already put it
+        if (!ref.current?.contains(document.activeElement)) ref.current?.focus();
         return () => {
             document.removeEventListener('keydown', onKey);
             document.body.style.overflow = '';
             prev?.focus?.();
         };
-    }, [open, onClose]);
+    }, [open]);
 
     if (!open) return null;
     return createPortal(

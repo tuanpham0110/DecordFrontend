@@ -35,11 +35,16 @@ const schema = z.object({
     MAIL_FROM: z.string().optional(),
 
     GEMINI_API_KEY: z.string().optional(),
-    GEMINI_MODEL: z.string().default('gemini-3.5-flash'),
+    GEMINI_MODEL: z.string().default('gemini-3.5-flash-lite'),
+    // tried in order when the main model is overloaded / retired (comma separated)
+    GEMINI_FALLBACK_MODELS: z.string().default('gemini-flash-lite-latest,gemini-3.5-flash'),
     AI_DAILY_LIMIT: z.coerce.number().int().positive().default(100),
 
     SPEECH_API_URL: z.string().optional(),
     SPEECH_API_KEY: z.string().optional(),
+
+    // "Đăng nhập bằng Google" – OAuth Client ID (Web) from Google Cloud Console. Empty = button hidden.
+    GOOGLE_CLIENT_ID: z.string().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -49,10 +54,21 @@ if (!parsed.success) {
     process.exit(1);
 }
 
+const isProd = parsed.data.NODE_ENV === 'production';
+const mailEnabled = Boolean(parsed.data.SMTP_HOST && parsed.data.SMTP_USER && parsed.data.SMTP_PASS);
+
 export const env = {
     ...parsed.data,
-    isProd: parsed.data.NODE_ENV === 'production',
-    mailEnabled: Boolean(parsed.data.SMTP_HOST && parsed.data.SMTP_USER && parsed.data.SMTP_PASS),
+    isProd,
+    mailEnabled,
+    /**
+     * Email OTP is enforced whenever it can be delivered. In production without SMTP nobody could
+     * ever receive a code, so sign-up skips it (accounts stay "unverified" and are asked to verify
+     * once SMTP is configured). In dev the code is printed to the console instead.
+     */
+    verificationRequired: mailEnabled || !isProd,
     aiEnabled: Boolean(parsed.data.GEMINI_API_KEY),
+    aiModels: [...new Set([parsed.data.GEMINI_MODEL, ...parsed.data.GEMINI_FALLBACK_MODELS.split(',')].map((m) => m.trim()).filter(Boolean))],
     speechEnabled: Boolean(parsed.data.SPEECH_API_URL),
+    googleEnabled: Boolean(parsed.data.GOOGLE_CLIENT_ID),
 };

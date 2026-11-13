@@ -49,7 +49,15 @@ export function createApp() {
 
     /** Which optional services are configured – lets the UI show/hide features. */
     app.get('/api/meta', (_req, res) => {
-        res.json({ ai: env.aiEnabled, aiModel: env.aiEnabled ? env.GEMINI_MODEL : null, speech: env.speechEnabled, mail: env.mailEnabled });
+        res.json({
+            ai: env.aiEnabled,
+            aiModel: env.aiEnabled ? env.GEMINI_MODEL : null,
+            speech: env.speechEnabled,
+            mail: env.mailEnabled,
+            emailVerification: env.verificationRequired,
+            passwordReset: env.mailEnabled || !env.isProd,
+            googleClientId: env.GOOGLE_CLIENT_ID || null,
+        });
     });
 
     app.use('/api', apiLimiter);

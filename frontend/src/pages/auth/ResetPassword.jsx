@@ -3,17 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { Button, TextField } from '../../components/ui.jsx';
 import { auth } from '../../services/api.js';
 import { useToast } from '../../context/ToastContext.jsx';
-import { FormAlert, validatePassword } from './shared.jsx';
-
-function strength(pw) {
-    let s = 0;
-    if (pw.length >= 8) s++;
-    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) s++;
-    if (/\d/.test(pw)) s++;
-    if (/[^A-Za-z0-9]/.test(pw) || pw.length >= 12) s++;
-    return s;
-}
-const LEVELS = ['Rất yếu', 'Yếu', 'Trung bình', 'Khá mạnh', 'Mạnh'];
+import { FormAlert, PasswordMeter, validatePassword } from './shared.jsx';
 
 export default function ResetPassword() {
     const navigate = useNavigate();
@@ -30,7 +20,6 @@ export default function ResetPassword() {
         setForm((f) => ({ ...f, [k]: e.target.value }));
         if (errors[k]) setErrors((x) => ({ ...x, [k]: '' }));
     };
-    const score = strength(form.password);
 
     async function onSubmit(e) {
         e.preventDefault();
@@ -43,7 +32,7 @@ export default function ResetPassword() {
         setLoading(true);
         try {
             await auth.resetPassword({ password: form.password });
-            toast('Đổi mật khẩu thành công. Mời bạn đăng nhập lại.');
+            toast('Đổi mật khẩu thành công. Mời bạn đăng nhập bằng mật khẩu mới.');
             navigate('/dang-nhap', { replace: true });
         } catch (err) {
             setFormError(err.message);
@@ -70,16 +59,7 @@ export default function ResetPassword() {
                     error={errors.password}
                     autoFocus
                 />
-                {form.password && !errors.password && (
-                    <div className="pw-meter" data-score={score}>
-                        <div className="pw-meter__bars" aria-hidden="true">
-                            {[0, 1, 2, 3].map((i) => (
-                                <span key={i} className={i < score ? 'on' : ''} />
-                            ))}
-                        </div>
-                        <span>Độ mạnh: {LEVELS[score]}</span>
-                    </div>
-                )}
+                {!errors.password && <PasswordMeter value={form.password} />}
                 <TextField
                     label="Xác nhận lại mật khẩu mới"
                     icon="lock"

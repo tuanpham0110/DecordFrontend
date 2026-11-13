@@ -15,15 +15,15 @@ backend/
 │   ├── server.js            khởi động, tắt an toàn
 │   ├── app.js               express app: bảo mật, CORS, route, xử lý lỗi
 │   ├── config/env.js        đọc + kiểm tra biến môi trường
-│   ├── lib/                 prisma, jwt, mailer, logger, thời gian, http helper
+│   ├── lib/                 prisma, jwt, mailer, google (xác minh ID token), logger, thời gian, http helper
 │   ├── middleware/          xác thực, giới hạn tần suất, lỗi
 │   └── modules/
-│       ├── auth/            đăng ký, đăng nhập, OTP, đặt lại mật khẩu
+│       ├── auth/            đăng ký, đăng nhập (email / Google), OTP, đặt lại mật khẩu, quản lý tài khoản
 │       ├── content/         nội dung công khai + bài học thử (cache 60s)
 │       ├── learning/        rules.js (luật thuần) · state.js · service · routes
 │       ├── review/          ôn tập ngắt quãng (Leitner)
 │       ├── notebook/        sổ tay
-│       ├── ai/              proxy Gemini (stream SSE)
+│       ├── ai/              proxy Gemini (stream SSE, tự chuyển model dự phòng, hạn mức/ngày trong DB)
 │       └── speech/          proxy dịch vụ chấm phát âm
 └── test/api.e2e.test.js     test end-to-end
 ```
@@ -57,14 +57,18 @@ Mọi lỗi trả về `{ message, code?, field? }`. Route `/api/me/*`, `/api/ai
 | Method | Đường dẫn | Mô tả |
 | --- | --- | --- |
 | GET | `/api/health` | trạng thái API + CSDL |
-| GET | `/api/meta` | tính năng nào đang bật `{ ai, aiModel, speech, mail }` |
-| POST | `/api/auth/register` | `{ name, email, password }` → gửi OTP |
+| GET | `/api/meta` | tính năng nào đang bật `{ ai, aiModel, speech, mail, emailVerification, passwordReset, googleClientId }` |
+| POST | `/api/auth/register` | `{ name, email, password }` → gửi OTP. Khi không cần xác thực email (production chưa có SMTP) trả luôn `session: { token, user }` |
 | POST | `/api/auth/login` | `{ email, password, remember }` → `{ token, user }` |
-| POST | `/api/auth/otp/verify` | `{ email, purpose: verify\|reset, code }` |
+| POST | `/api/auth/google` | `{ credential }` (ID token của Google Identity Services) → `{ token, user }`; tạo tài khoản ở lần đầu |
+| POST | `/api/auth/otp/verify` | `{ email, purpose: verify\|reset, code }` → verify: `{ token, user }` (đăng nhập luôn) · reset: `{ resetToken }` |
 | POST | `/api/auth/otp/resend` | `{ email, purpose }` |
 | POST | `/api/auth/password/forgot` | `{ email }` |
 | POST | `/api/auth/password/reset` | `{ resetToken, password }` |
-| GET | `/api/auth/me` | người dùng hiện tại |
+| GET | `/api/auth/me` | hồ sơ `{ id, name, email, createdAt, hasPassword, google, verified, dailyGoal }` |
+| PATCH | `/api/auth/me` | đổi tên `{ name }` |
+| POST | `/api/auth/password/change` | `{ currentPassword, newPassword }` → `{ token, user }` mới; các phiên cũ bị đăng xuất |
+| DELETE | `/api/auth/me` | `{ password }` (hoặc `{ confirmEmail }` với tài khoản chỉ dùng Google) → xoá tài khoản + toàn bộ dữ liệu |
 | GET | `/api/content/summary` · `/vocabulary` · `/handbook` | dữ liệu công khai |
 | GET / POST | `/api/content/trial` · `/trial/answers` | bài học thử (không lưu) |
 | GET | `/api/me/overview` | tổng quan, chặng, thống kê, huy hiệu |
@@ -82,21 +86,26 @@ Mọi lỗi trả về `{ message, code?, field? }`. Route `/api/me/*`, `/api/ai
 | GET / POST | `/api/me/notebook` · `/notebook/catalog` | sổ tay |
 | DELETE | `/api/me/notebook/:entryId` | bỏ lưu |
 | POST | `/api/me/notebook/:entryId/favorite` · `/review` | yêu thích / lật thẻ |
-| POST | `/api/ai/chat` | `{ messages: [{ role, text }] }` → stream SSE của Gemini |
+| POST | `/api/ai/chat` | `{ messages: [{ role, text }] }` → stream SSE của Gemini (header `X-AI-Model` cho biết model đã trả lời). Lỗi: `ai-busy` (mọi model quá tải), `ai-quota`, `ai-key`, `ai-model` |
 | POST | `/api/speech/assess` | multipart `audio`, `itemId` → `{ score, transcript?, words? }` |
 
 ## Bảo mật đã có
 
 Mật khẩu băm bcrypt · OTP 6 số băm HMAC, hết hạn 10 phút, tối đa 5 lần sai, chờ 60s mới gửi lại ·
 "Quên mật khẩu" không tiết lộ email có tồn tại hay không · JWT ký bằng `JWT_SECRET` · Helmet · CORS giới hạn origin ·
-giới hạn tần suất (đăng nhập, API, AI) · Zod kiểm tra mọi input · key Gemini chỉ ở server · bản ghi âm không ghi ra đĩa.
+giới hạn tần suất (đăng nhập, API, AI) · Zod kiểm tra mọi input · key Gemini chỉ ở server · bản ghi âm không ghi ra đĩa ·
+đổi / đặt lại mật khẩu thu hồi mọi token cũ (`User.passwordChangedAt`) và token đặt lại mật khẩu chỉ dùng được một lần ·
+ID token Google được kiểm tra chữ ký (JWKS), `aud`, `iss`, hạn dùng và `email_verified`.
 
 ## Đưa lên production
 
-1. Tạo PostgreSQL (VD: Supabase, Neon, Railway hoặc VPS), đặt `DATABASE_URL`.
+Bản đang chạy dùng **Vercel (serverless) + Neon** – xem mục *Deploy* ở [README gốc](../README.md). Tự host trên máy chủ riêng:
+
+1. Tạo PostgreSQL (VD: Neon, Supabase, Railway hoặc VPS), đặt `DATABASE_URL`.
 2. `NODE_ENV=production`, `JWT_SECRET` mới, `CORS_ORIGIN=https://tên-miền-frontend`, `TRUST_PROXY=true` nếu sau Nginx.
 3. `npm ci && npm run db:deploy && npm run db:seed && npm start` (hoặc dùng pm2 / Docker).
 4. Frontend: đặt `VITE_API_URL=https://tên-miền-api/api` khi build.
 
-Hạn chế hiện tại: giới hạn lượt AI/ngày lưu trong RAM (mất khi khởi động lại; nhiều server thì nên chuyển sang Redis);
-token đăng nhập chưa có cơ chế thu hồi (đăng xuất chỉ xoá token ở trình duyệt).
+Hạn chế hiện tại: giới hạn tần suất (rate limit) đếm trong bộ nhớ từng instance nên trên serverless chỉ mang tính tương đối
+(hạn mức AI/ngày thì lưu trong DB nên chính xác); đăng xuất chỉ xoá token ở trình duyệt (token bị thu hồi khi đổi mật khẩu);
+production chưa cấu hình SMTP thì email chưa được xác thực khi đăng ký.

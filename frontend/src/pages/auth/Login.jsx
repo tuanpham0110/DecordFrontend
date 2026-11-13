@@ -92,8 +92,7 @@ export default function Login() {
                 <Button type="submit" size="lg" block loading={loading}>
                     Đăng nhập
                 </Button>
-                <div className="divider">Hoặc đăng nhập bằng</div>
-                <SocialLogin />
+                <SocialLogin label="Hoặc đăng nhập bằng" onError={setFormError} />
             </form>
             <p className="auth-foot">
                 Chưa có tài khoản?{' '}

@@ -4,6 +4,7 @@
   "installCommand": "npm ci --prefix backend --include=dev && npm ci --prefix frontend --include=dev",
   "buildCommand": "bash scripts/vercel-build.sh",
   "outputDirectory": "frontend/dist",
+  "regions": ["sin1"],
   "functions": {
     "api/index.js": {
       "maxDuration": 60,

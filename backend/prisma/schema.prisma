@@ -18,6 +18,11 @@ model User {
   name         String
   email        String   @unique
   passwordHash String
+  /// false for accounts created with "Đăng nhập bằng Google" that never chose a password
+  passwordSet  Boolean  @default(true)
+  /// access / reset tokens issued before this moment are rejected
+  passwordChangedAt DateTime?
+  googleSub    String?  @unique
   verified     Boolean  @default(false)
   dailyGoal    Int      @default(10)
   reviewDone   Int      @default(0)

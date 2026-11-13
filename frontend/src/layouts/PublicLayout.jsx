@@ -90,7 +90,9 @@ export default function PublicLayout() {
                     </nav>
                 </div>
                 <div className="container site-footer__bottom">
-                    <span>© {new Date().getFullYear()} MUONGLAB</span>
+                    <span>
+                        © {new Date().getFullYear()} MUONGLAB · <Link to="/dieu-khoan">Điều khoản</Link> · <Link to="/bao-mat">Bảo mật</Link>
+                    </span>
                     <span>Nội dung tiếng Mường được đội ngũ chuyên môn biên soạn và kiểm chứng trước khi đăng.</span>
                 </div>
             </footer>

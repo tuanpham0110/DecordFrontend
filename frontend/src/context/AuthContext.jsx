@@ -16,12 +16,32 @@ export function AuthProvider({ children }) {
         return () => window.removeEventListener(UNAUTHORIZED_EVENT, onExpired);
     }, []);
 
-    const login = useCallback(async (payload) => {
-        const session = await auth.login(payload);
-        setSignedOut(false);
-        setUser(session);
-        return session;
+    const adopt = useCallback((u) => {
+        if (u) {
+            setSignedOut(false);
+            setUser(u);
+        }
+        return u;
     }, []);
+
+    const login = useCallback(async (payload) => adopt(await auth.login(payload)), [adopt]);
+    const googleLogin = useCallback(async (credential) => adopt(await auth.google(credential)), [adopt]);
+
+    /** Returns the signed-in user, or null when an email OTP still has to be confirmed. */
+    const register = useCallback(async (payload) => adopt((await auth.register(payload)).user), [adopt]);
+
+    /** Returns { purpose, user } – `user` is set once a sign-up has been confirmed. */
+    const verifyOtp = useCallback(
+        async (payload) => {
+            const r = await auth.verifyOtp(payload);
+            adopt(r.user);
+            return r;
+        },
+        [adopt]
+    );
+
+    const updateProfile = useCallback(async (payload) => adopt(await auth.updateProfile(payload)), [adopt]);
+    const changePassword = useCallback(async (payload) => adopt(await auth.changePassword(payload)), [adopt]);
 
     const logout = useCallback(() => {
         auth.logout();
@@ -29,7 +49,16 @@ export function AuthProvider({ children }) {
         setUser(null);
     }, []);
 
-    const value = useMemo(() => ({ user, signedOut, login, logout }), [user, signedOut, login, logout]);
+    const deleteAccount = useCallback(async (payload) => {
+        await auth.deleteAccount(payload);
+        setSignedOut(true);
+        setUser(null);
+    }, []);
+
+    const value = useMemo(
+        () => ({ user, signedOut, login, googleLogin, register, verifyOtp, updateProfile, changePassword, logout, deleteAccount }),
+        [user, signedOut, login, googleLogin, register, verifyOtp, updateProfile, changePassword, logout, deleteAccount]
+    );
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

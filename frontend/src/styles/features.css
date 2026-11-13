@@ -989,3 +989,306 @@ ol.overview__list {
     .native__gauge { width: 68px; height: 68px; }
     .native__num { font-size: 16px; }
 }
+
+/* ───────────── User menu ───────────── */
+a.user-menu__item {
+    text-decoration: none;
+}
+.user-menu__item:hover {
+    color: var(--forest-800);
+}
+.user-menu__item--danger:hover {
+    color: var(--danger);
+}
+
+/* ───────────── Chat: retry after a failed answer ───────────── */
+.chat__error span {
+    flex: 1;
+    min-width: 0;
+}
+.chat__retry {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid currentColor;
+    border-radius: var(--r-pill);
+    background: var(--surface);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--danger);
+    cursor: pointer;
+    transition: background var(--dur) var(--ease);
+}
+.chat__retry:hover {
+    background: var(--danger-bg);
+}
+
+/* ───────────── Auth: Google Identity Services button ───────────── */
+.auth-google {
+    display: flex;
+    justify-content: center;
+    min-height: 44px;
+}
+
+/* ───────────── Footer legal links ───────────── */
+.site-footer__bottom a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.site-footer__bottom a:hover {
+    color: var(--forest-700);
+}
+
+/* ───────────── Legal pages (public) ───────────── */
+.legal {
+    padding-block: calc(var(--header-h) + var(--s-8)) var(--s-16);
+}
+.legal .article-page {
+    max-width: 760px;
+    margin-inline: auto;
+}
+.legal .prose h3 {
+    margin-top: var(--s-8);
+}
+.legal .prose p,
+.legal .prose li {
+    line-height: 1.7;
+    color: var(--ink-2);
+}
+
+/* ───────────── Buttons: destructive ───────────── */
+.btn--danger {
+    border-color: #f0c4ba;
+    color: var(--danger);
+}
+.btn--danger:hover {
+    border-color: var(--danger);
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+.btn--danger-solid {
+    border-color: var(--danger);
+    background: var(--danger);
+    color: #fff;
+}
+.btn--danger-solid:hover {
+    border-color: #a32a14;
+    background: #a32a14;
+}
+
+/* ───────────── Account page ───────────── */
+.account__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-6);
+    align-items: start;
+}
+.account__col {
+    display: grid;
+    gap: var(--s-6);
+    min-width: 0;
+}
+.acct-card {
+    padding: var(--s-6);
+}
+.acct-card--danger {
+    border-color: #f3d9d2;
+}
+.acct-card__head {
+    display: flex;
+    gap: var(--s-3);
+    align-items: flex-start;
+    margin-bottom: var(--s-5);
+}
+.acct-card__head h2 {
+    font-size: var(--text-md);
+    font-weight: 700;
+    color: var(--forest-950);
+}
+.acct-card__head p {
+    margin-top: 2px;
+    font-size: var(--text-sm);
+    line-height: 1.5;
+    color: var(--muted);
+}
+.acct-card__icon {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--r-md);
+    background: var(--leaf-50);
+    color: var(--forest-700);
+}
+.acct-card__icon--clay {
+    background: var(--clay-50);
+    color: var(--clay-700);
+}
+.acct-card__icon--danger {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+.acct-form {
+    display: grid;
+    gap: var(--s-4);
+}
+.acct-form--modal {
+    gap: var(--s-5);
+}
+.acct-label {
+    display: grid;
+    gap: 6px;
+}
+.acct-label > span {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--ink-2);
+}
+.acct-id {
+    display: flex;
+    gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-3) var(--s-4);
+    border-radius: var(--r-md);
+    background: var(--paper);
+}
+.acct-id div {
+    display: grid;
+    min-width: 0;
+}
+.acct-id strong {
+    overflow: hidden;
+    font-size: var(--text-sm);
+    color: var(--ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.acct-id span:not(.avatar) {
+    font-size: 12px;
+    color: var(--muted);
+}
+.avatar--lg {
+    flex: none;
+    width: 48px;
+    height: 48px;
+    font-size: var(--text-base);
+}
+.acct-actions {
+    display: flex;
+    justify-content: flex-end;
+}
+.acct-goals {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: var(--s-3);
+}
+.acct-goal {
+    display: grid;
+    gap: 2px;
+    padding: var(--s-3) var(--s-2);
+    border: 1.5px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    text-align: center;
+    cursor: pointer;
+    transition:
+        border-color var(--dur) var(--ease),
+        background var(--dur) var(--ease);
+}
+.acct-goal strong {
+    font-size: var(--text-base);
+    color: var(--ink);
+}
+.acct-goal span {
+    font-size: 12px;
+    color: var(--muted);
+}
+.acct-goal:hover:not(:disabled) {
+    border-color: var(--leaf-300);
+}
+.acct-goal[aria-checked='true'] {
+    border-color: var(--forest-700);
+    background: var(--leaf-50);
+}
+.acct-goal[aria-checked='true'] strong {
+    color: var(--forest-800);
+}
+.acct-goal:disabled {
+    cursor: progress;
+}
+.acct-rows {
+    display: grid;
+}
+.acct-row {
+    display: flex;
+    gap: var(--s-4);
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--s-4) 0;
+}
+.acct-row + .acct-row {
+    border-top: 1px solid var(--line);
+}
+.acct-row:last-child {
+    padding-bottom: 0;
+}
+.acct-row div {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+.acct-row strong {
+    font-size: var(--text-sm);
+    color: var(--ink);
+}
+.acct-row span {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--muted);
+}
+.acct-row .btn {
+    flex: none;
+}
+@media (max-width: 1100px) {
+    .account__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 560px) {
+    .acct-card {
+        padding: var(--s-5) var(--s-4);
+    }
+    .acct-goals {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .acct-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .acct-actions .btn {
+        width: 100%;
+    }
+}
+
+/* ───────────── Fixes ───────────── */
+/* "Đang khoá" used to wrap onto two lines inside the journey rows */
+.lock-btn {
+    flex: none;
+    white-space: nowrap;
+}
+.srow__bar {
+    grid-template-columns: minmax(0, 1fr) 48px minmax(104px, max-content);
+}
+.srow__link {
+    justify-self: end;
+    white-space: nowrap;
+}
+/* keep the last row of a page clear of the floating "Hỏi AI" button */
+.app__content {
+    padding-bottom: 104px;
+}

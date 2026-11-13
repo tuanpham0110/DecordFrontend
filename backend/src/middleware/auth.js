@@ -14,8 +14,13 @@ export async function requireAuth(req, _res, next) {
         } catch {
             throw unauthorized();
         }
-        const user = await prisma.user.findUnique({ where: { id: payload.sub }, select: { id: true, name: true, email: true, verified: true } });
+        const user = await prisma.user.findUnique({
+            where: { id: payload.sub },
+            select: { id: true, name: true, email: true, verified: true, passwordChangedAt: true },
+        });
         if (!user || !user.verified) throw unauthorized();
+        // changing / resetting the password signs out every session opened before it
+        if (user.passwordChangedAt && payload.iat * 1000 < user.passwordChangedAt.getTime()) throw unauthorized();
         req.user = user;
         next();
     } catch (e) {

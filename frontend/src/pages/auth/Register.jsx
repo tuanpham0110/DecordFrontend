@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Checkbox, TextField } from '../../components/ui.jsx';
-import { auth } from '../../services/api.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useToast } from '../../context/ToastContext.jsx';
 import { FormAlert, SocialLogin, isEmail, validatePassword } from './shared.jsx';
 
 export default function Register() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { register } = useAuth();
+    const toast = useToast();
     const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '', agree: false });
     const [errors, setErrors] = useState({});
     const [formError, setFormError] = useState('');
@@ -33,8 +36,10 @@ export default function Register() {
 
         setLoading(true);
         try {
-            await auth.register(form);
-            navigate('/xac-thuc', { state: { from: location.state?.from } });
+            const user = await register(form);
+            // email verification off on this server → already signed in (the guest-only route redirects)
+            if (user) toast(`Chào mừng ${user.name} đến với MUONGLAB!`);
+            else navigate('/xac-thuc', { state: { from: location.state?.from } });
         } catch (err) {
             if (err.field) setErrors((x) => ({ ...x, [err.field]: err.message }));
             else setFormError(err.message);
@@ -61,7 +66,7 @@ export default function Register() {
                     value={form.password}
                     onChange={set('password')}
                     error={errors.password}
-                    hint="Tối thiểu 8 ký tự."
+                    hint="Tối thiểu 8 ký tự, có cả chữ cái và chữ số."
                 />
                 <TextField
                     label="Xác nhận mật khẩu"
@@ -75,21 +80,20 @@ export default function Register() {
                 <div className="auth-row auth-row--stack">
                     <Checkbox checked={form.agree} onChange={set('agree')} error={errors.agree}>
                         Tôi đồng ý với{' '}
-                        <a href="#dieu-khoan" className="link">
+                        <Link to="/dieu-khoan" target="_blank" className="link">
                             Điều khoản sử dụng
-                        </a>{' '}
+                        </Link>{' '}
                         và{' '}
-                        <a href="#bao-mat" className="link">
+                        <Link to="/bao-mat" target="_blank" className="link">
                             Chính sách bảo mật
-                        </a>
+                        </Link>
                     </Checkbox>
                     {errors.agree && <p className="field__msg">{errors.agree}</p>}
                 </div>
                 <Button type="submit" size="lg" block loading={loading}>
                     Đăng ký
                 </Button>
-                <div className="divider">Hoặc đăng ký bằng</div>
-                <SocialLogin />
+                <SocialLogin label="Hoặc đăng ký bằng" onError={setFormError} />
             </form>
             <p className="auth-foot">
                 Đã có tài khoản?{' '}

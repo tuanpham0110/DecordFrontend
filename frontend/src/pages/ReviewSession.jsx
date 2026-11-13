@@ -108,6 +108,8 @@ export default function ReviewSession() {
                             return r;
                         }}
                         onRate={async (rating) => {
+                            // re-tapping another rating must not reschedule the card a second time
+                            if (log.some((l) => l.itemId === card.itemId)) return;
                             const r = await review.answer(card.itemId, rating);
                             setLog((x) => [...x, { itemId: card.itemId, label: card.label, ...r }]);
                         }}

@@ -1,9 +1,9 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import Icon from './Icon.jsx';
 import { askTutor } from '../services/ai/tutor.js';
+import { CHAT_KEY as STORE_KEY } from '../services/api.js';
 import useMeta from '../hooks/useMeta.js';
 
-const STORE_KEY = 'muonglab.chat';
 export const OPEN_CHAT_EVENT = 'muonglab:open-chat';
 
 /** Opens the AI chat from anywhere (search, buttons…). */
@@ -92,7 +92,7 @@ export default function ChatBox() {
     const [messages, setMessages] = useState(loadChat);
     const [input, setInput] = useState('');
     const [busy, setBusy] = useState(false);
-    const [error, setError] = useState(null);
+    const [error, setError] = useState(null); // { message, retry?: string }
     const abortRef = useRef(null);
     const listRef = useRef(null);
     const inputRef = useRef(null);
@@ -105,12 +105,13 @@ export default function ChatBox() {
     }, [messages, open, busy]);
 
     const send = useCallback(
-        async (raw) => {
+        async (raw, { retry = false } = {}) => {
             const text = (raw ?? '').trim();
             if (!text || busy) return;
             setError(null);
-            setInput('');
-            const history = [...messages, { role: 'user', text }];
+            if (!retry) setInput('');
+            // a retry re-asks the question that is already the last message
+            const history = retry ? messages : [...messages, { role: 'user', text }];
             setMessages([...history, { role: 'model', text: '', pending: true }]);
             setBusy(true);
             const ctrl = new AbortController();
@@ -132,7 +133,9 @@ export default function ChatBox() {
                     });
                 } else {
                     setMessages(history);
-                    setError(e.message);
+                    // the question stays in the thread; quota / config problems are not worth retrying
+                    const retryable = !['ai-quota', 'ai-disabled', 'ai-key', 'ai-model'].includes(e.code) && e.status !== 401;
+                    setError({ message: e.message, retry: retryable ? text : null });
                 }
             } finally {
                 setBusy(false);
@@ -192,7 +195,7 @@ export default function ChatBox() {
                         <div className="chat__who">
                             <strong>Ếch Mường</strong>
                             <span>
-                                <i className={`chat__dot ${aiConfigured ? '' : 'is-off'}`} /> {aiConfigured ? `Trợ lý AI · ${meta.aiModel}` : meta ? 'Chưa kết nối API' : 'Đang kết nối…'}
+                                <i className={`chat__dot ${aiConfigured ? '' : 'is-off'}`} /> {aiConfigured ? 'Trợ lý AI · Sẵn sàng' : meta ? 'Chưa được bật' : 'Đang kết nối…'}
                             </span>
                         </div>
                         <button type="button" className="chat__icon" onClick={reset} title="Cuộc trò chuyện mới" aria-label="Cuộc trò chuyện mới">
@@ -227,15 +230,26 @@ export default function ChatBox() {
                             <div className="chat__setup">
                                 <Icon name="info" size={18} />
                                 <p>
-                                    Trợ lý AI chưa được bật trên máy chủ. Quản trị viên cần thêm <code>GEMINI_API_KEY</code> vào <code>backend/.env</code> rồi khởi
-                                    động lại backend.
+                                    Trợ lý AI chưa được bật trên máy chủ.
+                                    {import.meta.env.DEV && (
+                                        <>
+                                            {' '}
+                                            Thêm <code>GEMINI_API_KEY</code> vào <code>backend/.env</code> rồi khởi động lại backend.
+                                        </>
+                                    )}
                                 </p>
                             </div>
                         )}
 
                         {error && (
                             <div className="chat__error" role="alert">
-                                <Icon name="alert" size={16} /> {error}
+                                <Icon name="alert" size={16} />
+                                <span>{error.message}</span>
+                                {error.retry && (
+                                    <button type="button" className="chat__retry" onClick={() => send(error.retry, { retry: true })}>
+                                        <Icon name="refresh" size={14} /> Thử lại
+                                    </button>
+                                )}
                             </div>
                         )}
 

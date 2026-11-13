@@ -5,9 +5,12 @@
  */
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { createApp } from '../src/app.js';
 import { prisma } from '../src/lib/prisma.js';
+import { resetGoogleKeyCache, verifyGoogleIdToken } from '../src/lib/google.js';
 
 let server;
 let base;
@@ -151,5 +154,115 @@ describe('notebook + review + public', () => {
     test('AI and speech report disabled cleanly when not configured', async () => {
         const meta = await api('GET', '/meta', null, false);
         if (!meta.data.ai) assert.equal((await api('POST', '/ai/chat', { messages: [{ role: 'user', text: 'hi' }] })).status, 503);
+    });
+});
+
+describe('account', () => {
+    const e = `acc-${Date.now()}@test.local`;
+    let t1;
+    const as = (tok) => async (method, path, body) => {
+        const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
+        return { status: res.status, data: await res.json() };
+    };
+    /** Plants a known OTP the same way the service hashes it. */
+    async function plantOtp(email, purpose, code) {
+        await prisma.otpCode.updateMany({ where: { email, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
+        const codeHash = crypto.createHmac('sha256', process.env.JWT_SECRET).update(`${email}|${purpose}|${code}`).digest('hex');
+        await prisma.otpCode.create({ data: { email, purpose, codeHash, expiresAt: new Date(Date.now() + 60_000) } });
+    }
+    const pause = () => new Promise((r) => setTimeout(r, 1100)); // JWT iat has second precision
+
+    test('confirming the OTP signs the learner in', async () => {
+        assert.equal((await api('POST', '/auth/register', { name: 'Tài Khoản', email: e, password: 'Abcd1234' }, false)).status, 201);
+        await plantOtp(e, 'verify', '123456');
+        const v = await api('POST', '/auth/otp/verify', { email: e, purpose: 'verify', code: '123456' }, false);
+        assert.equal(v.status, 200);
+        assert.ok(v.data.token);
+        assert.equal(v.data.user.email, e);
+        t1 = v.data.token;
+        const me = await as(t1)('GET', '/auth/me');
+        assert.equal(me.data.hasPassword, true);
+        assert.equal(me.data.verified, true);
+    });
+
+    test('a verified email cannot be registered again', async () => {
+        const r = await api('POST', '/auth/register', { name: 'Kẻ Khác', email: e, password: 'Abcd1234' }, false);
+        assert.equal(r.status, 400);
+        assert.equal(r.data.code, 'email-taken');
+    });
+
+    test('rename', async () => {
+        assert.equal((await as(t1)('PATCH', '/auth/me', { name: 'A' })).status, 400);
+        const r = await as(t1)('PATCH', '/auth/me', { name: '  Bùi Thị Hoa ' });
+        assert.equal(r.data.name, 'Bùi Thị Hoa');
+    });
+
+    test('changing the password needs the current one and signs out older sessions', async () => {
+        assert.equal((await as(t1)('POST', '/auth/password/change', { currentPassword: 'wrong', newPassword: 'Newpass123' })).data.code, 'bad-password');
+        assert.equal((await as(t1)('POST', '/auth/password/change', { currentPassword: 'Abcd1234', newPassword: 'Abcd1234' })).data.code, 'same-password');
+        await pause();
+        const r = await as(t1)('POST', '/auth/password/change', { currentPassword: 'Abcd1234', newPassword: 'Newpass123' });
+        assert.equal(r.status, 200);
+        assert.equal((await as(t1)('GET', '/auth/me')).status, 401, 'old token is rejected');
+        assert.equal((await as(r.data.token)('GET', '/auth/me')).status, 200, 'fresh token works');
+        assert.equal((await api('POST', '/auth/login', { email: e, password: 'Abcd1234' }, false)).status, 401);
+        t1 = (await api('POST', '/auth/login', { email: e, password: 'Newpass123' }, false)).data.token;
+        assert.ok(t1);
+    });
+
+    test('password reset: OTP, new password, and the reset token is single use', async () => {
+        await plantOtp(e, 'reset', '654321');
+        const v = await api('POST', '/auth/otp/verify', { email: e, purpose: 'reset', code: '654321' }, false);
+        assert.ok(v.data.resetToken);
+        await pause();
+        assert.equal((await api('POST', '/auth/password/reset', { resetToken: v.data.resetToken, password: 'Reset1234' }, false)).status, 200);
+        assert.equal((await api('POST', '/auth/password/reset', { resetToken: v.data.resetToken, password: 'Again1234' }, false)).data.code, 'reset-expired');
+        assert.equal((await as(t1)('GET', '/auth/me')).status, 401, 'sessions opened before the reset are closed');
+        t1 = (await api('POST', '/auth/login', { email: e, password: 'Reset1234' }, false)).data.token;
+        assert.ok(t1);
+    });
+
+    test('delete account needs the password and removes everything', async () => {
+        await as(t1)('POST', '/me/notebook', { type: 'word', ref: 'em' });
+        assert.equal((await as(t1)('DELETE', '/auth/me', { password: 'nope' })).status, 400);
+        assert.equal((await as(t1)('DELETE', '/auth/me', { password: 'Reset1234' })).status, 200);
+        assert.equal(await prisma.user.count({ where: { email: e } }), 0);
+        assert.equal((await as(t1)('GET', '/auth/me')).status, 401);
+    });
+
+    test('meta lists what the server has configured', async () => {
+        const m = (await api('GET', '/meta', null, false)).data;
+        for (const k of ['ai', 'speech', 'mail', 'emailVerification', 'passwordReset', 'googleClientId']) assert.ok(k in m, k);
+    });
+});
+
+describe('Google ID token verification', () => {
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const jwk = { ...publicKey.export({ format: 'jwk' }), kid: 'test-key', alg: 'RS256', use: 'sig' };
+    const loadKeys = async () => ({ keys: [jwk], maxAge: 60 });
+    const sign = (claims, opts = {}) =>
+        jwt.sign({ sub: '1234567890', email: 'Hoa@Example.com', email_verified: true, name: 'Hoa Bùi', ...claims }, opts.key ?? privateKey, {
+            algorithm: 'RS256',
+            keyid: opts.kid ?? 'test-key',
+            audience: opts.aud ?? 'my-client-id',
+            issuer: opts.iss ?? 'https://accounts.google.com',
+            expiresIn: opts.exp ?? '5m',
+        });
+
+    test('accepts a valid token', async () => {
+        resetGoogleKeyCache();
+        const g = await verifyGoogleIdToken(sign(), 'my-client-id', { loadKeys });
+        assert.deepEqual(g, { sub: '1234567890', email: 'hoa@example.com', name: 'Hoa Bùi' });
+    });
+    test('rejects wrong audience, issuer, expiry, signer and unverified email', async () => {
+        const other = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 }).privateKey;
+        const bad = [sign({}, { aud: 'someone-else' }), sign({}, { iss: 'https://evil.example' }), sign({}, { exp: '-1m' }), sign({}, { key: other }), sign({ email_verified: false }), sign({}, { kid: 'unknown' }), 'not-a-jwt'];
+        for (const tok of bad) await assert.rejects(verifyGoogleIdToken(tok, 'my-client-id', { loadKeys }));
+    });
+    test('the endpoint reports "disabled" when no client id is configured', async () => {
+        if (process.env.GOOGLE_CLIENT_ID) return;
+        const r = await api('POST', '/auth/google', { credential: 'x'.repeat(40) }, false);
+        assert.equal(r.status, 503);
+        assert.equal(r.data.code, 'google-disabled');
     });
 });

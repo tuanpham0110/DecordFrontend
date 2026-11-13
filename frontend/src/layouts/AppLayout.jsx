@@ -16,6 +16,9 @@ function UserMenu() {
     const { user, logout } = useAuth();
     const [open, setOpen] = useState(false);
     const ref = useRef(null);
+    const { pathname } = useLocation();
+
+    useEffect(() => setOpen(false), [pathname]);
 
     useEffect(() => {
         if (!open) return;
@@ -42,11 +45,11 @@ function UserMenu() {
                         <strong>{user?.name}</strong>
                         <span>{user?.email}</span>
                     </div>
-                    <button
-                        role="menuitem"
-                        className="user-menu__item"
-                        onClick={logout}
-                    >
+                    <Link role="menuitem" to="/tai-khoan" className="user-menu__item">
+                        <Icon name="user" size={18} />
+                        Tài khoản
+                    </Link>
+                    <button role="menuitem" className="user-menu__item user-menu__item--danger" onClick={logout}>
                         <Icon name="logout" size={18} />
                         Đăng xuất
                     </button>

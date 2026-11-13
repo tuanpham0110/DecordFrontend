@@ -20,6 +20,8 @@ import LessonPlayer from './pages/LessonPlayer.jsx';
 import ReviewSession from './pages/ReviewSession.jsx';
 import Notebook from './pages/Notebook.jsx';
 import Handbook from './pages/Handbook.jsx';
+import Account from './pages/Account.jsx';
+import { Privacy, Terms } from './pages/Legal.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 function ScrollToTop() {
@@ -43,6 +45,8 @@ export default function App() {
             <Routes>
                 <Route element={<PublicLayout />}>
                     <Route index element={<Landing />} />
+                    <Route path="dieu-khoan" element={<Terms />} />
+                    <Route path="bao-mat" element={<Privacy />} />
                 </Route>
 
                 {/* Focus layouts – no site chrome while learning */}
@@ -92,6 +96,7 @@ export default function App() {
                     <Route path="on-luyen" element={<Practice />} />
                     <Route path="so-tay" element={<Notebook />} />
                     <Route path="cam-nang" element={<Handbook />} />
+                    <Route path="tai-khoan" element={<Account />} />
                 </Route>
 
                 <Route path="*" element={<NotFound />} />

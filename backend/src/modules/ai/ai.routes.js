@@ -1,9 +1,12 @@
 /**
  * AI tutor proxy (Google Gemini). The API key never leaves the server.
- * The response is Gemini's own SSE stream, piped through unchanged.
+ * The response is Gemini's own SSE stream, passed through unchanged.
+ *
+ * Free-tier models are regularly overloaded (HTTP 503) or retired (404), so each
+ * question walks a chain of models (GEMINI_MODEL, then GEMINI_FALLBACK_MODELS)
+ * and uses the first one that starts answering in time.
  */
 import { Router } from 'express';
-import { Readable } from 'node:stream';
 import { z } from 'zod';
 import { env } from '../../config/env.js';
 import { ah, parse } from '../../lib/http.js';
@@ -45,15 +48,62 @@ async function takeQuota(userId) {
         update: { count: { increment: 1 } },
         select: { count: true },
     });
-    if (count > env.AI_DAILY_LIMIT) throw tooMany(`Bạn đã dùng hết ${env.AI_DAILY_LIMIT} lượt hỏi AI hôm nay. Hẹn bạn ngày mai nhé!`, { code: 'ai-quota' });
+    if (count > env.AI_DAILY_LIMIT) {
+        await refundQuota(userId, day);
+        throw tooMany(`Bạn đã dùng hết ${env.AI_DAILY_LIMIT} lượt hỏi AI hôm nay. Hẹn bạn ngày mai nhé!`, { code: 'ai-quota' });
+    }
+    return day;
+}
+/** A question that got no answer does not count. */
+function refundQuota(userId, day) {
+    return prisma.aiUsage.updateMany({ where: { userId, day, count: { gt: 0 } }, data: { count: { decrement: 1 } } }).catch(() => {});
 }
 
-function geminiError(status, body) {
+/* ───────────── Upstream call with model fallback ───────────── */
+const FIRST_CHUNK_TIMEOUT = 12_000; // an overloaded model often accepts the request and then stalls
+const TRY_NEXT = new Set([404, 408, 429, 500, 502, 503, 504]);
+
+/**
+ * Starts a streamed answer on one model. Resolves with { reader, first } once the first
+ * chunk has arrived; throws { status, body } / a timeout error otherwise.
+ */
+async function openStream(model, payload, clientSignal) {
+    const ctrl = new AbortController();
+    const onClientAbort = () => ctrl.abort(clientSignal.reason);
+    if (clientSignal.aborted) onClientAbort();
+    else clientSignal.addEventListener('abort', onClientAbort, { once: true });
+    const timer = setTimeout(() => ctrl.abort(new DOMException('Model did not start answering in time', 'TimeoutError')), FIRST_CHUNK_TIMEOUT);
+    try {
+        const res = await fetch(`${ENDPOINT}/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+            body: JSON.stringify(payload),
+            signal: ctrl.signal,
+        });
+        if (!res.ok || !res.body) {
+            const body = await res.text().catch(() => '');
+            throw Object.assign(new Error(`Gemini ${res.status}`), { status: res.status, body });
+        }
+        const reader = res.body.getReader();
+        const first = await reader.read();
+        if (first.done) throw Object.assign(new Error('Gemini returned an empty stream'), { status: 502, body: '' });
+        return { reader, first: first.value, cancel: () => ctrl.abort() };
+    } catch (e) {
+        ctrl.abort();
+        throw e;
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function upstreamError(last) {
+    const status = last?.status;
+    const body = last?.body ?? '';
     if (status === 400 && /API key/i.test(body)) return unavailable('API key Gemini trên máy chủ không hợp lệ.', { code: 'ai-key' });
     if (status === 401 || status === 403) return unavailable('API key Gemini không có quyền gọi model này.', { code: 'ai-key' });
-    if (status === 404) return unavailable(`Không tìm thấy model "${env.GEMINI_MODEL}".`, { code: 'ai-model' });
-    if (status === 429) return tooMany('Trợ lý AI đang quá tải (giới hạn của gói miễn phí). Đợi một lát rồi thử lại.', { code: 'ai-busy' });
-    return new HttpError(502, 'Không gọi được trợ lý AI. Vui lòng thử lại.', { code: 'ai-upstream' });
+    if (status === 404) return unavailable('Model AI đã cấu hình không còn khả dụng. Quản trị viên cần cập nhật GEMINI_MODEL.', { code: 'ai-model' });
+    if (status === 400) return new HttpError(502, 'Trợ lý AI từ chối yêu cầu này. Hãy thử hỏi theo cách khác.', { code: 'ai-upstream' });
+    return unavailable('Trợ lý AI đang quá tải. Bạn thử lại sau ít phút nhé.', { code: 'ai-busy' });
 }
 
 const schema = z.object({
@@ -74,35 +124,62 @@ aiRoutes.post(
         const { messages } = parse(schema, req.body);
         const firstUser = messages.findIndex((m) => m.role === 'user');
         if (firstUser < 0) throw new HttpError(400, 'Thiếu câu hỏi.');
-        await takeQuota(req.user.id);
+        const day = await takeQuota(req.user.id);
 
-        const C = await getContent();
-        const ctrl = new AbortController();
-        res.on('close', () => ctrl.abort());
+        const client = new AbortController();
+        res.on('close', () => !res.writableEnded && client.abort());
 
-        const upstream = await fetch(`${ENDPOINT}/${encodeURIComponent(env.GEMINI_MODEL)}:streamGenerateContent?alt=sse`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-            body: JSON.stringify({
+        let stream = null;
+        let last = null;
+        try {
+            const C = await getContent();
+            const payload = {
                 systemInstruction: { parts: [{ text: systemPrompt(C) }] },
                 contents: messages.slice(firstUser).map((m) => ({ role: m.role, parts: [{ text: m.text }] })),
-                generationConfig: { temperature: 0.5, maxOutputTokens: 1024 },
-            }),
-            signal: ctrl.signal,
-        });
-        if (!upstream.ok || !upstream.body) {
-            const body = await upstream.text().catch(() => '');
-            logger.warn(`Gemini ${upstream.status}: ${body.slice(0, 300)}`);
-            throw geminiError(upstream.status, body);
+                generationConfig: { temperature: 0.5, maxOutputTokens: 2048 },
+            };
+            for (const model of env.aiModels) {
+                try {
+                    stream = { model, ...(await openStream(model, payload, client.signal)) };
+                    break;
+                } catch (e) {
+                    if (client.signal.aborted) break; // the learner closed the chat
+                    last = e;
+                    logger.warn(`AI model ${model} failed (${e.status ?? e.name}): ${String(e.body ?? e.message).replace(/\s+/g, ' ').slice(0, 200)}`);
+                    const retryable = e.status == null || TRY_NEXT.has(e.status);
+                    if (!retryable) break;
+                }
+            }
+        } catch (e) {
+            await refundQuota(req.user.id, day);
+            throw e;
+        }
+        if (!stream) {
+            await refundQuota(req.user.id, day);
+            if (client.signal.aborted) return void res.end();
+            throw upstreamError(last);
         }
 
-        res.status(200).set({ 'Content-Type': 'text/event-stream; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Connection: 'keep-alive' });
+        res.status(200).set({
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-cache, no-transform',
+            Connection: 'keep-alive',
+            'X-Accel-Buffering': 'no',
+            'X-AI-Model': stream.model,
+        });
         res.flushHeaders();
-        Readable.fromWeb(upstream.body)
-            .on('error', (e) => {
-                if (e.name !== 'AbortError') logger.warn('AI stream error:', e.message);
-                res.end();
-            })
-            .pipe(res);
+        try {
+            res.write(stream.first);
+            for (;;) {
+                const { value, done } = await stream.reader.read();
+                if (done) break;
+                res.write(value);
+            }
+        } catch (e) {
+            if (!client.signal.aborted) logger.warn(`AI stream error (${stream.model}):`, e.message);
+        } finally {
+            stream.cancel();
+            res.end();
+        }
     })
 );
