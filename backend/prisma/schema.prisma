@@ -1,0 +1,221 @@
+// MUONGLAB database schema
+// Content (stages, lessons, exercises, vocabulary, handbook) is seeded from prisma/data/content.js.
+// Learner data (progress, sessions, review cards, notebook…) belongs to a User and is deleted with it.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/* ───────────── Accounts ───────────── */
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  verified     Boolean  @default(false)
+  dailyGoal    Int      @default(10)
+  reviewDone   Int      @default(0)
+
+  // first-try statistics per exercise part
+  listenCorrect   Int @default(0)
+  listenTotal     Int @default(0)
+  buildCorrect    Int @default(0)
+  buildTotal      Int @default(0)
+  shadowPracticed Int @default(0)
+  shadowTotal     Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  progress LessonProgress[]
+  sessions LessonSession[]
+  attempts Attempt[]
+  cards    ReviewCard[]
+  notebook NotebookEntry[]
+  daily    DailyActivity[]
+}
+
+model OtpCode {
+  id         String    @id @default(cuid())
+  email      String
+  purpose    String // verify | reset
+  codeHash   String
+  attempts   Int       @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email, purpose])
+}
+
+/* ───────────── Course content ───────────── */
+
+model Stage {
+  id       Int      @id
+  code     String
+  tone     String
+  title    String
+  summary  String
+  position Int
+  lessons  Lesson[]
+}
+
+model Lesson {
+  id        Int          @id
+  stageId   Int
+  stage     Stage        @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  title     String
+  minutes   Int
+  published Boolean      @default(false)
+  position  Int
+  goals     String[]
+  items     LessonItem[]
+
+  @@index([stageId])
+}
+
+/// One exercise. `data` holds what the learner may see before answering;
+/// `answer`, `explain` and `translation` are only revealed after grading.
+model Item {
+  id          String       @id
+  part        String // listen | build | shadow
+  kind        String // listen-pick | listen-meaning | fill | order | shadow
+  data        Json
+  answer      Json?
+  explain     String?
+  translation String?
+  lessons     LessonItem[]
+}
+
+model LessonItem {
+  lessonId Int
+  itemId   String
+  part     String
+  position Int
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  item     Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([lessonId, itemId])
+}
+
+model Vocabulary {
+  id       String  @id
+  word     String
+  meaning  String
+  topic    String
+  note     String?
+  lessonId Int?
+  position Int
+}
+
+model Sentence {
+  id       String @id
+  text     String
+  meaning  String
+  topic    String
+  lessonId Int?
+  position Int
+}
+
+model HandbookArticle {
+  id       String  @id
+  category String
+  title    String
+  excerpt  String
+  minutes  Int
+  draft    Boolean @default(false)
+  body     Json?
+  position Int
+}
+
+/* ───────────── Learner data ───────────── */
+
+model LessonProgress {
+  userId   String
+  lessonId Int
+  best     Int?
+  passed   Boolean   @default(false)
+  attempts Int       @default(0)
+  lastAt   DateTime?
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, lessonId])
+}
+
+/// An in-progress lesson (autosaved, resumable).
+model LessonSession {
+  userId    String
+  lessonId  Int
+  step      Int      @default(0)
+  answers   Json     @default("{}")
+  shadow    Json     @default("{}")
+  startedAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, lessonId])
+}
+
+model Attempt {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    Int
+  stageId     Int
+  title       String
+  score       Int
+  passed      Boolean
+  parts       Json
+  durationSec Int
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Spaced-repetition card (Leitner boxes 1–4, box 5 = mastered).
+model ReviewCard {
+  userId      String
+  itemId      String
+  part        String
+  lessonId    Int
+  box         Int       @default(1)
+  due         DateTime?
+  wrong       Int       @default(0)
+  right       Int       @default(0)
+  mastered    Boolean   @default(false)
+  lastCorrect Boolean   @default(false)
+  addedAt     DateTime  @default(now())
+  lastAt      DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, itemId])
+}
+
+model NotebookEntry {
+  userId       String
+  entryId      String // "word:<id>" | "sentence:<id>"
+  favorite     Boolean   @default(false)
+  reviews      Int       @default(0)
+  known        Boolean?
+  lastReviewAt DateTime?
+  savedAt      DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, entryId])
+}
+
+model DailyActivity {
+  userId   String
+  day      String // YYYY-MM-DD in APP_TIMEZONE
+  answered Int    @default(0)
+  correct  Int    @default(0)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+}

@@ -1,0 +1,22 @@
+# PostgreSQL cho môi trường dev:  docker compose up -d db   (cổng máy: 5434, đổi bằng biến DB_PORT)
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: muonglab-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: muonglab
+      POSTGRES_PASSWORD: muonglab
+      POSTGRES_DB: muonglab
+    ports:
+      - "${DB_PORT:-5434}:5432"
+    volumes:
+      - muonglab-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U muonglab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  muonglab-db:
