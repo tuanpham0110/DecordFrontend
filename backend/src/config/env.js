@@ -35,7 +35,7 @@ const schema = z.object({
     MAIL_FROM: z.string().optional(),
 
     GEMINI_API_KEY: z.string().optional(),
-    GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+    GEMINI_MODEL: z.string().default('gemini-3.5-flash'),
     AI_DAILY_LIMIT: z.coerce.number().int().positive().default(100),
 
     SPEECH_API_URL: z.string().optional(),
