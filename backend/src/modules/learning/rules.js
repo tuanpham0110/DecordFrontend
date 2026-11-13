@@ -79,12 +79,13 @@ export function revealed(C, id) {
     return { answer: it.answer, explain: it.explain, translation: it.translation };
 }
 
-export function itemLabel(C, id) {
+export function itemLabel(C, id, { reveal = false } = {}) {
     const it = C.ITEMS[id];
     if (!it) return id;
     if (it.kind === 'shadow') return it.text;
-    if (it.kind === 'order') return it.answer.join(' ');
-    if (it.kind === 'fill') return [it.before, it.answer, it.after].filter(Boolean).join(' ');
+    if (it.kind === 'order') return reveal ? it.answer.join(' ') : it.prompt || 'Sắp xếp các từ thành câu';
+    if (it.kind === 'fill') return reveal ? [it.before, it.answer, it.after].filter(Boolean).join(' ') : [it.before, '___', it.after].filter(Boolean).join(' ');
+    if (it.kind === 'listen-pick' && !reveal) return it.prompt || 'Nghe và chọn từ';
     return it.audioText;
 }
 
@@ -168,7 +169,8 @@ export function decorateStages(C, data) {
             counts: l.parts ? Object.fromEntries(PART_ORDER.map((p) => [p, l.parts[p]?.length ?? 0])) : null,
         }));
         const completed = lessons.filter((l) => l.status === 'done').length;
-        const percent = lessons.length ? Math.round((completed / lessons.length) * 100) : 0;
+        const published = lessons.filter((l) => l.published).length;
+        const percent = published ? Math.round((completed / published) * 100) : 0;
         const anyOpen = lessons.some((l) => l.status === 'done' || l.status === 'current');
         const unlocked = gates[s.id];
         const complete = stageComplete(data, s);
@@ -185,8 +187,9 @@ export function decorateStages(C, data) {
             summary: s.summary,
             lessons,
             completed,
-            total: lessons.length,
-            published: lessons.filter((l) => l.published).length,
+            total: published,
+            plannedTotal: lessons.length,
+            published,
             percent,
             unlocked,
             complete,
@@ -230,6 +233,6 @@ export const BADGES = [
     { id: 'khoi-dau', title: 'Khởi đầu', desc: 'Hoàn thành bài học đầu tiên', icon: 'flag', test: (d) => Object.values(d.lessons).some((l) => l.passed) },
     { id: 'tai-thinh', title: 'Tai thính', desc: 'Nghe đúng 10 câu', icon: 'headphones', test: (d) => d.partStats.listen.correct >= 10 },
     { id: 'kien-tri', title: 'Kiên trì', desc: 'Học 3 ngày liên tiếp', icon: 'flame', test: (d) => streakOf(d) >= 3 },
-    { id: 'hoan-hao', title: 'Hoàn hảo', desc: 'Đạt 100% một bài học', icon: 'star', test: (d) => d.attempts.some((a) => a.score === 100) },
+    { id: 'hoan-hao', title: 'Hoàn hảo', desc: 'Đạt 100% một bài học', icon: 'star', test: (d) => d.hasPerfectAttempt ?? d.attempts.some((a) => a.score === 100) },
     { id: 'cham-on', title: 'Chăm ôn', desc: 'Ôn tập 10 lượt', icon: 'refresh', test: (d) => (d.reviewDone || 0) >= 10 },
 ];

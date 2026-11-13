@@ -6,13 +6,14 @@
  *
  * Base URL: VITE_API_URL (default "/api" – Vite proxies it to the backend in dev).
  */
-export const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+export const API_URL = (import.meta.env?.VITE_API_URL || '/api').replace(/\/$/, '');
 const TIMEOUT = 15000;
 
-const SESSION_KEY = 'muonglab.session';
+export const SESSION_KEY = 'muonglab.session';
 const PENDING_KEY = 'muonglab.pending';
 export const CHAT_KEY = 'muonglab.chat';
 export const UNAUTHORIZED_EVENT = 'muonglab:unauthorized';
+let boundAccountId;
 
 export class ApiError extends Error {
     constructor(message, field, extra = {}) {
@@ -45,6 +46,7 @@ function session() {
     return read(localStorage, SESSION_KEY) || read(sessionStorage, SESSION_KEY);
 }
 function clearSession() {
+    boundAccountId = null;
     write(localStorage, SESSION_KEY, null);
     write(sessionStorage, SESSION_KEY, null);
     write(sessionStorage, CHAT_KEY, null); // the AI chat belongs to the account that just left
@@ -52,6 +54,7 @@ function clearSession() {
 /** Stores a fresh session; `remember` keeps it across browser restarts. */
 function openSession({ token, user }, remember) {
     clearSession();
+    boundAccountId = user.id;
     write(remember ? localStorage : sessionStorage, SESSION_KEY, { token, user });
     write(localStorage, PENDING_KEY, null);
     return user;
@@ -74,45 +77,113 @@ export const authToken = () => session()?.token ?? null;
 export async function request(method, path, { body, form, auth = true, signal, raw = false, timeout = TIMEOUT } = {}) {
     const headers = {};
     if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const token = auth ? authToken() : null;
+    const current = auth ? session() : null;
+    const token = current?.token ?? null;
+    const sessionChanged = () => new ApiError('Phiên đăng nhập đã thay đổi. Vui lòng tải lại trang.', undefined, { status: 409, code: 'session-changed' });
+    if (auth && boundAccountId !== undefined && (current?.user?.id ?? null) !== boundAccountId) throw sessionChanged();
     if (token) headers.Authorization = `Bearer ${token}`;
 
     const ctrl = new AbortController();
     const timer = timeout ? setTimeout(() => ctrl.abort(new DOMException('timeout', 'TimeoutError')), timeout) : null;
     const onAbort = () => ctrl.abort(signal.reason);
-    signal?.addEventListener('abort', onAbort);
+    const onStorage = (event) => {
+        if ((event.key === SESSION_KEY || event.key === null) && token !== authToken()) ctrl.abort(sessionChanged());
+    };
+    if (signal?.aborted) onAbort();
+    else signal?.addEventListener('abort', onAbort, { once: true });
+    if (auth) window.addEventListener('storage', onStorage);
+    const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
+        if (auth) window.removeEventListener('storage', onStorage);
+    };
+    const checkSession = () => {
+        if (auth && token !== authToken()) throw sessionChanged();
+    };
+    const requestError = (e) => {
+        if (ctrl.signal.reason instanceof ApiError) return ctrl.signal.reason;
+        if (signal?.aborted) return signal.reason ?? e;
+        if (ctrl.signal.reason?.name === 'TimeoutError') return new ApiError('Máy chủ phản hồi quá lâu. Vui lòng thử lại.', undefined, { status: 408 });
+        if (e instanceof ApiError) return e;
+        return new ApiError('Không kết nối được máy chủ. Kiểm tra mạng hoặc thử lại sau.', undefined, { status: 0, code: 'network' });
+    };
 
-    let res;
+    let handedOff = false;
     try {
-        res = await fetch(API_URL + path, {
+        const res = await fetch(API_URL + path, {
             method,
             headers,
             body: form ?? (body !== undefined ? JSON.stringify(body) : undefined),
             signal: ctrl.signal,
         });
-    } catch (e) {
-        if (signal?.aborted) throw e; // caller cancelled
-        if (ctrl.signal.reason?.name === 'TimeoutError') throw new ApiError('Máy chủ phản hồi quá lâu. Vui lòng thử lại.', undefined, { status: 408 });
-        throw new ApiError('Không kết nối được máy chủ. Kiểm tra mạng hoặc thử lại sau.', undefined, { status: 0, code: 'network' });
-    } finally {
-        if (timer && !raw) clearTimeout(timer);
-        signal?.removeEventListener('abort', onAbort);
-    }
-
-    if (!res.ok) {
-        if (timer) clearTimeout(timer);
-        const data = await res.json().catch(() => ({}));
-        if (res.status === 401 && token) {
-            clearSession();
-            window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+        checkSession();
+        if (!res.ok) {
+            const data = await res.json().catch((e) => {
+                if (ctrl.signal.aborted) throw e;
+                return {};
+            });
+            checkSession();
+            if (res.status === 401 && token) {
+                clearSession();
+                window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+            }
+            throw new ApiError(data.message || 'Đã có lỗi xảy ra.', data.field, { status: res.status, code: data.code, verificationToken: data.verificationToken });
         }
-        throw new ApiError(data.message || 'Đã có lỗi xảy ra.', data.field, { status: res.status, code: data.code });
+        if (raw && res.body) {
+            const reader = res.body.getReader();
+            let finished = false;
+            let onBodyAbort;
+            const finish = () => {
+                finished = true;
+                ctrl.signal.removeEventListener('abort', onBodyAbort);
+                cleanup();
+            };
+            const bodyStream = new ReadableStream({
+                start(controller) {
+                    onBodyAbort = () => {
+                        if (finished) return;
+                        finish();
+                        reader.cancel(ctrl.signal.reason).catch(() => {});
+                        controller.error(requestError(ctrl.signal.reason));
+                    };
+                    ctrl.signal.addEventListener('abort', onBodyAbort, { once: true });
+                    if (ctrl.signal.aborted) onBodyAbort();
+                },
+                async pull(controller) {
+                    try {
+                        checkSession();
+                        const { value, done } = await reader.read();
+                        if (finished) return;
+                        checkSession();
+                        if (done) {
+                            finish();
+                            controller.close();
+                        } else controller.enqueue(value);
+                    } catch (e) {
+                        if (finished) return;
+                        finish();
+                        reader.cancel(e).catch(() => {});
+                        controller.error(requestError(e));
+                    }
+                },
+                cancel(reason) {
+                    finish();
+                    ctrl.abort(reason);
+                    return reader.cancel(reason);
+                },
+            }, { highWaterMark: 0 });
+            handedOff = true;
+            return new Response(bodyStream, { status: res.status, statusText: res.statusText, headers: res.headers });
+        }
+        if (raw) return res;
+        const data = res.status === 204 ? null : await res.json();
+        checkSession();
+        return data;
+    } catch (e) {
+        throw requestError(e);
+    } finally {
+        if (!handedOff) cleanup();
     }
-    if (raw) {
-        if (timer) clearTimeout(timer);
-        return res;
-    }
-    return res.status === 204 ? null : res.json();
 }
 
 const get = (p, o) => request('GET', p, o);
@@ -125,14 +196,16 @@ const del = (p, body, o) => request('DELETE', p, { ...o, body });
 export const auth = {
     /** The signed-in user ({ id, name, email, role }) or null. */
     currentSession() {
-        return session()?.user ?? null;
+        const user = session()?.user ?? null;
+        boundAccountId = user?.id ?? null;
+        return user;
     },
 
     async login({ email, password, remember }) {
         try {
             return openSession(await post('/auth/login', { email: email.trim(), password, remember: !!remember }, { auth: false }), remember);
         } catch (e) {
-            if (e.code === 'unverified') write(localStorage, PENDING_KEY, { email: email.trim(), purpose: 'verify' });
+            if (e.code === 'unverified') write(localStorage, PENDING_KEY, { email: email.trim(), purpose: 'verify', verificationToken: e.verificationToken });
             throw e;
         }
     },
@@ -154,7 +227,7 @@ export const auth = {
     async register({ name, email, password }) {
         const r = await post('/auth/register', { name, email: email.trim(), password }, { auth: false });
         if (r.session) return { user: openSession(r.session, true) };
-        write(localStorage, PENDING_KEY, { email: r.email, purpose: 'verify' });
+        write(localStorage, PENDING_KEY, { email: r.email, purpose: 'verify', verificationToken: r.verificationToken });
         return { user: null };
     },
 
@@ -172,7 +245,8 @@ export const auth = {
     async resendOtp() {
         const p = auth.pending();
         if (!p) throw new ApiError('Phiên xác thực đã hết hạn. Vui lòng thực hiện lại.');
-        await post('/auth/otp/resend', { email: p.email, purpose: p.purpose }, { auth: false });
+        if (p.purpose === 'verify' && !p.verificationToken) throw new ApiError('Phiên xác thực đăng ký đã hết hạn. Vui lòng đăng ký lại hoặc đăng nhập bằng mật khẩu đã chọn.', undefined, { code: 'verification-expired' });
+        await post('/auth/otp/resend', { email: p.email, purpose: p.purpose, verificationToken: p.verificationToken }, { auth: false });
         return true;
     },
 
@@ -180,7 +254,8 @@ export const auth = {
     async verifyOtp({ code }) {
         const p = auth.pending();
         if (!p) throw new ApiError('Phiên xác thực đã hết hạn. Vui lòng thực hiện lại.');
-        const r = await post('/auth/otp/verify', { email: p.email, purpose: p.purpose, code }, { auth: false });
+        if (p.purpose === 'verify' && !p.verificationToken) throw new ApiError('Phiên xác thực đăng ký đã hết hạn. Vui lòng đăng ký lại hoặc đăng nhập bằng mật khẩu đã chọn.', undefined, { code: 'verification-expired' });
+        const r = await post('/auth/otp/verify', { email: p.email, purpose: p.purpose, code, verificationToken: p.verificationToken }, { auth: false });
         if (p.purpose === 'reset') {
             write(localStorage, PENDING_KEY, { ...p, verified: true, resetToken: r.resetToken });
             return { purpose: 'reset', user: null };
@@ -241,9 +316,9 @@ export const learning = {
     lessonInfo: (id) => get(`/me/lessons/${id}`),
     startLesson: (id) => post(S(id)),
     saveStep: (lessonId, step) => patch(`${S(lessonId)}/step`, { step }),
-    answer: (lessonId, itemId, response) => post(`${S(lessonId)}/answers`, { itemId, response }),
-    rateShadow: (lessonId, itemId, rating) => post(`${S(lessonId)}/shadow`, { itemId, rating }),
-    finishLesson: (lessonId) => post(`${S(lessonId)}/finish`),
+    answer: (lessonId, itemId, response, contentVersion) => post(`${S(lessonId)}/answers`, { itemId, response, contentVersion }),
+    rateShadow: (lessonId, itemId, rating, contentVersion) => post(`${S(lessonId)}/shadow`, { itemId, rating, contentVersion }),
+    finishLesson: (lessonId, contentVersion) => post(`${S(lessonId)}/finish`, { contentVersion }),
     restartLesson: (lessonId) => del(S(lessonId)),
     history: () => get('/me/history'),
     setGoal: (goal) => put('/me/goal', { goal }).then((r) => r.goal),
@@ -267,7 +342,7 @@ export const review = {
         return get(`/me/review/queue?${q}`);
     },
     list: () => get('/me/review'),
-    answer: (itemId, response) => post('/me/review/answers', { itemId, response }),
+    answer: (itemId, response, reviewToken) => post('/me/review/answers', { itemId, response, reviewToken }),
 };
 
 const E = (id) => `/me/notebook/${encodeURIComponent(id)}`;

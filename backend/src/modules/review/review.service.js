@@ -3,6 +3,8 @@ import { badRequest, notFound } from '../../lib/errors.js';
 import { getContent } from '../content/content.service.js';
 import { gradeResponse, itemLabel, publicItem, revealed, scheduleCard } from '../learning/rules.js';
 import { bumpDaily, toCard } from '../learning/state.js';
+import { learnerTransaction } from '../learning/transaction.js';
+import { assertReviewToken, reviewToken } from './token.js';
 
 export const reviewService = {
     async queue(userId, { scope = 'due', itemIds } = {}) {
@@ -12,7 +14,7 @@ export const reviewService = {
         let cards = rows.map(toCard).filter((c) => C.ITEMS[c.itemId]);
         if (itemIds?.length) cards = cards.filter((c) => itemIds.includes(c.itemId));
         else if (scope === 'due') cards = cards.filter((c) => c.due <= now);
-        return cards.sort((a, b) => a.due - b.due).map((c) => ({ ...c, label: itemLabel(C, c.itemId), item: publicItem(C, c.itemId) }));
+        return cards.sort((a, b) => a.due - b.due).map((c) => ({ ...c, reviewToken: reviewToken(userId, c, C.ITEMS[c.itemId]), label: itemLabel(C, c.itemId), item: publicItem(C, c.itemId) }));
     },
 
     async list(userId) {
@@ -26,14 +28,15 @@ export const reviewService = {
             .map((c) => ({ ...c, isDue: !c.mastered && c.due <= now, label: itemLabel(C, c.itemId), partTitle: C.PARTS[c.part].title }));
     },
 
-    async answer(userId, itemId, response) {
+    async answer(userId, itemId, response, token) {
         const C = await getContent();
         const item = C.ITEMS[itemId];
         if (!item) throw notFound('Không tìm thấy câu ôn tập.');
 
-        return prisma.$transaction(async (tx) => {
+        return learnerTransaction(userId, async (tx) => {
             const row = await tx.reviewCard.findUnique({ where: { userId_itemId: { userId, itemId } } });
             if (!row) throw notFound('Câu này không có trong danh sách ôn tập.');
+            assertReviewToken(token, userId, row, item);
             let correct;
             if (item.part === 'shadow') {
                 if (!['good', 'ok', 'again'].includes(response)) throw badRequest('Đánh giá không hợp lệ.');

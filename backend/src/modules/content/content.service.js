@@ -4,6 +4,7 @@
  */
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
+import { formatGuidance } from './guidance.js';
 
 export const PART_ORDER = ['listen', 'build', 'shadow'];
 
@@ -46,7 +47,7 @@ async function load() {
         ...s,
         lessons: lessons
             .filter((l) => l.stageId === s.id)
-            .map((l) => ({ id: l.id, stageId: s.id, title: l.title, minutes: l.minutes, published: l.published, goals: l.goals, parts: partsOf[l.id] ?? null })),
+            .map((l) => ({ id: l.id, stageId: s.id, title: l.title, minutes: l.minutes, published: l.published, goals: (l.goals ?? []).map((g) => formatGuidance(g, env.PASS_THRESHOLD)), parts: partsOf[l.id] ?? null })),
     }));
 
     return {
@@ -56,7 +57,7 @@ async function load() {
         PASS_THRESHOLD: env.PASS_THRESHOLD,
         VOCABULARY: vocabulary.map(({ position, ...v }) => ({ ...v, note: v.note ?? undefined })),
         SENTENCES: sentences.map(({ position, ...s }) => s),
-        HANDBOOK: handbook.map(({ position, ...a }) => ({ ...a, body: a.body ?? undefined })),
+        HANDBOOK: handbook.map(({ position, ...a }) => ({ ...a, body: Array.isArray(a.body) ? a.body.map((b) => b.p ? { ...b, p: formatGuidance(b.p, env.PASS_THRESHOLD) } : b) : a.body ?? undefined })),
     };
 }
 

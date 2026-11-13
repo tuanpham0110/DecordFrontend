@@ -266,7 +266,7 @@ export default function Landing() {
                     <div className="lp-head lp-head--left">
                         <span className="eyebrow">Phương pháp</span>
                         <h2>Mỗi bài học, ba bước từ nghe đến nói</h2>
-                        <p>Ba dạng bài lặp lại ở mọi bài với chủ đề và độ khó tăng dần. Đạt từ 80% là mở khoá bài tiếp theo.</p>
+                        <p>Ba dạng bài lặp lại ở mọi bài với chủ đề và độ khó tăng dần. {summary ? `Đạt từ ${summary.threshold}% là mở khoá bài tiếp theo.` : 'Đạt ngưỡng yêu cầu của bài để mở khoá bài tiếp theo.'}</p>
                     </div>
                     <ol className="method__grid">
                         {METHOD.map((m) => (

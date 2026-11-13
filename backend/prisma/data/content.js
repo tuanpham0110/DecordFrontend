@@ -1,3 +1,5 @@
+import { SHADOW_GUIDANCE } from '../../src/modules/content/guidance.js';
+
 /**
  * Course content used by the mock server (src/services/server/).
  *
@@ -408,7 +410,7 @@ export const HANDBOOK = [
                 ],
             },
             {
-                p: 'Bản ghi âm chỉ được lưu tạm trên trình duyệt của bạn để nghe lại, không được tải lên máy chủ. Hiện MUONGLAB chưa có công nghệ chấm điểm phát âm tự động cho tiếng Mường.',
+                p: SHADOW_GUIDANCE,
             },
         ],
     },

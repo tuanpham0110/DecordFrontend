@@ -8,6 +8,7 @@ import { learning } from '../services/api.js';
 import useAsync from '../hooks/useAsync.js';
 import GlobalSearch from '../components/GlobalSearch.jsx';
 import { WEEKDAY, formatWhen } from '../utils/format.js';
+import { resumeLabel } from '../utils/learning.js';
 
 const GOALS = [5, 10, 20, 30];
 const PART_ICON = { listen: 'headphones', build: 'puzzle', shadow: 'mic' };
@@ -46,7 +47,7 @@ function ContinueCard({ data, name }) {
     let body;
     if (resume) {
         body = {
-            label: `Đang dừng ở câu ${resume.done + 1}/${resume.total} · ${resume.part}`,
+            label: resumeLabel(resume),
             title: `Bài ${resume.lessonId}: ${resume.title}`,
             sub: `Chặng ${resume.stageId}: ${resume.stageTitle}`,
             to: `/hoc/${resume.lessonId}`,

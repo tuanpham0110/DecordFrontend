@@ -6,6 +6,7 @@ import { Logo } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { NAV_GROUPS, NAV_ITEMS } from './nav.js';
 import ChatBox from '../components/ChatBox.jsx';
+import { resumeLabel } from '../utils/learning.js';
 
 function initials(name = '') {
     const parts = name.trim().split(/\s+/);
@@ -94,7 +95,7 @@ export default function AppLayout() {
     const badgeLabel = { due: 'câu đến hạn ôn', support: 'tin nhắn mới từ quản trị viên' };
     const today = info?.stats.today;
     const focus = info?.resume
-        ? { id: info.resume.lessonId, title: info.resume.title, label: `Câu ${info.resume.done + 1}/${info.resume.total} · ${info.resume.part}`, pct: (info.resume.done / info.resume.total) * 100, cta: 'Học tiếp' }
+        ? { id: info.resume.lessonId, title: info.resume.title, label: resumeLabel(info.resume), pct: (info.resume.done / info.resume.total) * 100, cta: 'Học tiếp' }
         : info?.current
           ? { id: info.current.lesson.id, title: info.current.lesson.title, label: 'Bài tiếp theo', pct: null, cta: 'Bắt đầu' }
           : null;

@@ -1,6 +1,6 @@
 /**
  * AI tutor proxy (Google Gemini). The API key never leaves the server.
- * The response is Gemini's own SSE stream, passed through unchanged.
+ * Gemini SSE frames are preserved, followed by an application completion/error event.
  *
  * Free-tier models are regularly overloaded (HTTP 503) or retired (404), so each
  * question walks a chain of models (GEMINI_MODEL, then GEMINI_FALLBACK_MODELS)
@@ -17,6 +17,7 @@ import { dayKey } from '../../lib/time.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { aiLimiter } from '../../middleware/rateLimit.js';
 import { getContent } from '../content/content.service.js';
+import { GeminiStreamState, shouldRefund } from './stream.js';
 
 const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -54,7 +55,7 @@ async function takeQuota(userId) {
     }
     return day;
 }
-/** A question that got no answer does not count. */
+/** Provider failures/empty answers do not count; cancelling after text was delivered does. */
 function refundQuota(userId, day) {
     return prisma.aiUsage.updateMany({ where: { userId, day, count: { gt: 0 } }, data: { count: { decrement: 1 } } }).catch(() => {});
 }
@@ -87,8 +88,12 @@ async function openStream(model, payload, clientSignal) {
         const reader = res.body.getReader();
         const first = await reader.read();
         if (first.done) throw Object.assign(new Error('Gemini returned an empty stream'), { status: 502, body: '' });
-        return { reader, first: first.value, cancel: () => ctrl.abort() };
+        return { reader, first: first.value, cancel: (reason) => {
+            clientSignal.removeEventListener('abort', onClientAbort);
+            ctrl.abort(reason);
+        } };
     } catch (e) {
+        clientSignal.removeEventListener('abort', onClientAbort);
         ctrl.abort();
         throw e;
     } finally {
@@ -168,16 +173,29 @@ aiRoutes.post(
             'X-AI-Model': stream.model,
         });
         res.flushHeaders();
+        const state = new GeminiStreamState();
+        // Keep a bound after the first token too, within the function's 60s execution limit.
+        const timer = setTimeout(() => stream.cancel(new DOMException('AI stream timed out', 'TimeoutError')), 20_000);
         try {
+            state.push(stream.first);
             res.write(stream.first);
             for (;;) {
                 const { value, done } = await stream.reader.read();
                 if (done) break;
+                state.push(value);
                 res.write(value);
             }
+            state.finish();
+            if (!client.signal.aborted) res.write('event: muonglab-complete\ndata: {}\n\n');
         } catch (e) {
-            if (!client.signal.aborted) logger.warn(`AI stream error (${stream.model}):`, e.message);
+            if (shouldRefund(state, client.signal.aborted)) await refundQuota(req.user.id, day);
+            if (!client.signal.aborted) {
+                logger.warn(`AI stream error (${stream.model}):`, e.message);
+                const message = e.code?.startsWith('ai-') ? e.message : 'Trợ lý chưa trả lời đầy đủ. Vui lòng thử lại.';
+                res.write(`\n\nevent: muonglab-error\ndata: ${JSON.stringify({ message, code: e.code?.startsWith('ai-') ? e.code : 'ai-incomplete' })}\n\n`);
+            }
         } finally {
+            clearTimeout(timer);
             stream.cancel();
             res.end();
         }

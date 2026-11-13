@@ -10,7 +10,7 @@ export function notFoundRoute(req, res) {
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, _next) {
     if (err instanceof HttpError) {
-        return res.status(err.status).json({ message: err.message, code: err.code, field: err.field });
+        return res.status(err.status).json({ message: err.message, code: err.code, field: err.field, verificationToken: err.verificationToken });
     }
     if (err?.type === 'entity.parse.failed') {
         return res.status(400).json({ message: 'Dữ liệu gửi lên không phải JSON hợp lệ.', code: 'bad-json' });

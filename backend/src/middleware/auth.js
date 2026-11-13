@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma.js';
-import { verifyToken } from '../lib/jwt.js';
+import { accessTokenIsCurrent, verifyToken } from '../lib/jwt.js';
 import { forbidden, unauthorized } from '../lib/errors.js';
 
 /** Requires "Authorization: Bearer <token>". Sets req.user = { id, name, email, role }. */
@@ -16,12 +16,13 @@ export async function requireAuth(req, _res, next) {
         }
         const user = await prisma.user.findUnique({
             where: { id: payload.sub },
-            select: { id: true, name: true, email: true, role: true, verified: true, passwordChangedAt: true },
+            select: { id: true, name: true, email: true, role: true, verified: true, passwordChangedAt: true, passwordHash: true },
         });
         if (!user || !user.verified) throw unauthorized();
         // changing / resetting the password signs out every session opened before it
-        if (user.passwordChangedAt && payload.iat * 1000 < user.passwordChangedAt.getTime()) throw unauthorized();
-        req.user = user;
+        if (!accessTokenIsCurrent(payload, user)) throw unauthorized();
+        const { passwordHash, ...safeUser } = user;
+        req.user = safeUser;
         next();
     } catch (e) {
         next(e);

@@ -103,14 +103,14 @@ export default function ReviewSession() {
                         allowRetry={false}
                         allowSkip={false}
                         onAnswer={async (resp) => {
-                            const r = await review.answer(card.itemId, resp);
+                            const r = await review.answer(card.itemId, resp, card.reviewToken);
                             setLog((x) => [...x, { itemId: card.itemId, label: card.label, ...r }]);
                             return r;
                         }}
                         onRate={async (rating) => {
                             // re-tapping another rating must not reschedule the card a second time
                             if (log.some((l) => l.itemId === card.itemId)) return;
-                            const r = await review.answer(card.itemId, rating);
+                            const r = await review.answer(card.itemId, rating, card.reviewToken);
                             setLog((x) => [...x, { itemId: card.itemId, label: card.label, ...r }]);
                         }}
                         onSave={async (entry) => {

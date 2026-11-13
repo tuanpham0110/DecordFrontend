@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button, ErrorState, Ring, Skeleton } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
@@ -8,14 +8,15 @@ import { learning, notebook } from '../services/api.js';
 import { createTrialAdapter } from '../services/trial.js';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { answerFeedback } from '../utils/learning.js';
 
 function serverAdapter(lessonId) {
     return {
         start: () => learning.startLesson(lessonId),
-        answer: (itemId, r) => learning.answer(lessonId, itemId, r),
-        rate: (itemId, r) => learning.rateShadow(lessonId, itemId, r),
+        answer: (itemId, r, contentVersion) => learning.answer(lessonId, itemId, r, contentVersion),
+        rate: (itemId, r, contentVersion) => learning.rateShadow(lessonId, itemId, r, contentVersion),
         saveStep: (step) => learning.saveStep(lessonId, step).catch(() => {}),
-        finish: () => learning.finishLesson(lessonId),
+        finish: (contentVersion) => learning.finishLesson(lessonId, contentVersion),
         restart: () => learning.restartLesson(lessonId),
         save: (entry) => notebook.save(entry),
         savedIds: () => notebook.list().then((l) => new Set(l.map((n) => n.id))),
@@ -279,6 +280,7 @@ export default function LessonPlayer({ trial = false }) {
     const [saved, setSaved] = useState(new Set());
     const [result, setResult] = useState(null);
     const [finishing, setFinishing] = useState(false);
+    const finishingRef = useRef(false);
     const [confirmExit, setConfirmExit] = useState(false);
     const [nonce, setNonce] = useState(0);
 
@@ -303,13 +305,14 @@ export default function LessonPlayer({ trial = false }) {
                 setStep(start);
                 setFurthest(start);
                 setState({ loading: false, error: null, data });
+                if (data.contentChanged) toast('Nội dung bài đã được cập nhật. Các câu đã làm được đối chiếu lại với nội dung hiện tại.', { tone: 'info' });
             })
             .catch((error) => alive && setState({ loading: false, error, data: null }));
         if (!trial && adapter.savedIds) adapter.savedIds().then((s) => alive && setSaved(s)).catch(() => {});
         return () => {
             alive = false;
         };
-    }, [adapter, trial, nonce]);
+    }, [adapter, trial, nonce, toast]);
 
     const data = state.data;
     const items = useMemo(() => (data ? data.parts.flatMap((p) => p.items) : []), [data]);
@@ -329,9 +332,11 @@ export default function LessonPlayer({ trial = false }) {
     );
 
     async function finish() {
+        if (finishingRef.current) return;
+        finishingRef.current = true;
         setFinishing(true);
         try {
-            const r = await adapter.finish();
+            const r = await adapter.finish(data.contentVersion);
             setResult(r);
             setStep(total + 1);
             if (!trial && r.stageTransition?.to?.unlocked) toast(`Đã mở khoá Chặng ${r.stageTransition.to.id}: ${r.stageTransition.to.title}`);
@@ -339,6 +344,7 @@ export default function LessonPlayer({ trial = false }) {
         } catch (e) {
             toast(e.message || 'Không chấm được bài. Vui lòng thử lại.', { tone: 'error' });
         } finally {
+            finishingRef.current = false;
             setFinishing(false);
         }
     }
@@ -523,21 +529,16 @@ export default function LessonPlayer({ trial = false }) {
                                     ? { rating: ratings[item.id] }
                                     : answers[item.id] && {
                                           response: answers[item.id].response,
-                                          result: {
-                                              correct: answers[item.id].correct,
-                                              answer: answers[item.id].answer,
-                                              explain: answers[item.id].explain,
-                                              translation: answers[item.id].translation,
-                                          },
+                                          result: answerFeedback(answers[item.id]),
                                       }
                             }
                             onAnswer={async (resp) => {
-                                const r = await adapter.answer(item.id, resp);
-                                setAnswers((a) => ({ ...a, [item.id]: a[item.id] ? { ...a[item.id], response: resp } : { ...r, response: resp } }));
+                                const r = await adapter.answer(item.id, resp, data.contentVersion);
+                                setAnswers((a) => ({ ...a, [item.id]: a[item.id] ? { ...a[item.id], response: resp, retryCorrect: r.correct } : { ...r, response: resp } }));
                                 return r;
                             }}
                             onRate={async (rating) => {
-                                await adapter.rate(item.id, rating);
+                                await adapter.rate(item.id, rating, data.contentVersion);
                                 setRatings((m) => ({ ...m, [item.id]: rating }));
                             }}
                             onSave={

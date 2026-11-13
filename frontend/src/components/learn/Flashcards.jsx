@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Progress } from '../ui.jsx';
 import Icon from '../Icon.jsx';
 import AudioPlayer from './AudioPlayer.jsx';
@@ -20,28 +20,64 @@ export default function Flashcards({ cards, onMark }) {
     const [deck, setDeck] = useState(cards);
     const [i, setI] = useState(0);
     const [flipped, setFlipped] = useState(false);
-    const [known, setKnown] = useState(0);
+    const [known, setKnown] = useState(() => new Set());
+    const [busy, setBusy] = useState(false);
+    const [error, setError] = useState('');
+    const operation = useRef({ busy: false, version: 0 });
 
     useEffect(() => {
         setDeck(cards);
         setI(0);
         setFlipped(false);
-        setKnown(0);
+        setKnown(new Set());
+        setBusy(false);
+        setError('');
+        operation.current.busy = false;
+        return () => { operation.current.version++; };
     }, [cards]);
 
     const card = deck[i];
     const done = i >= deck.length;
 
     const go = (d) => {
+        if (operation.current.busy) return;
         setFlipped(false);
         setI((x) => Math.max(0, Math.min(deck.length - 1, x + d)));
     };
-    const mark = (isKnown) => {
-        onMark?.(card, isKnown);
-        if (isKnown) setKnown((k) => k + 1);
-        else setDeck((d) => [...d, card]); // see it again later
+    const restart = () => {
+        if (operation.current.busy) return;
+        setDeck(shuffle(cards));
+        setI(0);
+        setKnown(new Set());
         setFlipped(false);
-        setI((x) => x + 1);
+        setError('');
+    };
+    const mark = async (isKnown) => {
+        if (operation.current.busy || !card) return;
+        operation.current.busy = true;
+        const version = operation.current.version;
+        setBusy(true);
+        setError('');
+        try {
+            await onMark?.(card, isKnown);
+            if (version !== operation.current.version) return;
+            setKnown((current) => {
+                const next = new Set(current);
+                if (isKnown) next.add(card.id);
+                else next.delete(card.id);
+                return next;
+            });
+            if (!isKnown) setDeck((d) => [...d, card]);
+            setFlipped(false);
+            setI((x) => x + 1);
+        } catch (err) {
+            if (version === operation.current.version) setError(err.message || 'Chưa lưu được kết quả ôn. Vui lòng thử lại.');
+        } finally {
+            if (version === operation.current.version) {
+                operation.current.busy = false;
+                setBusy(false);
+            }
+        }
     };
 
     useEffect(() => {
@@ -65,15 +101,11 @@ export default function Flashcards({ cards, onMark }) {
                 <img src="/assets/mascot-cheer.webp" alt="" />
                 <h2>Xong bộ thẻ!</h2>
                 <p>
-                    Bạn đã nhớ <strong>{known}</strong>/{cards.length} thẻ.
+                    Bạn đã nhớ <strong>{known.size}</strong>/{cards.length} thẻ.
                 </p>
                 <Button
                     iconLeft="shuffle"
-                    onClick={() => {
-                        setDeck(shuffle(cards));
-                        setI(0);
-                        setKnown(0);
-                    }}
+                    onClick={restart}
                 >
                     Trộn và ôn lại
                 </Button>
@@ -89,11 +121,8 @@ export default function Flashcards({ cards, onMark }) {
                 </span>
                 <button
                     className="link"
-                    onClick={() => {
-                        setDeck(shuffle(cards));
-                        setI(0);
-                        setFlipped(false);
-                    }}
+                    onClick={restart}
+                    disabled={busy}
                 >
                     Trộn thẻ
                 </button>
@@ -125,14 +154,15 @@ export default function Flashcards({ cards, onMark }) {
             </div>
 
             <div className="flash__nav">
-                <Button variant="light" iconLeft="arrow-left" onClick={() => go(-1)} disabled={i === 0} aria-label="Thẻ trước" />
-                <Button variant="light" iconLeft="refresh" onClick={() => mark(false)}>
+                <Button variant="light" iconLeft="arrow-left" onClick={() => go(-1)} disabled={i === 0 || busy} aria-label="Thẻ trước" />
+                <Button variant="light" iconLeft="refresh" onClick={() => mark(false)} disabled={busy}>
                     Chưa nhớ
                 </Button>
-                <Button variant="leaf" iconLeft="check" onClick={() => mark(true)}>
+                <Button variant="leaf" iconLeft="check" onClick={() => mark(true)} disabled={busy}>
                     Đã nhớ
                 </Button>
             </div>
+            {error && <p className="stage__error" role="alert">{error}</p>}
             <p className="flash__keys">
                 <Icon name="keyboard" size={14} />
                 <span>

@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { UNAUTHORIZED_EVENT, auth } from '../services/api.js';
+import { SESSION_KEY, CHAT_KEY, UNAUTHORIZED_EVENT, auth } from '../services/api.js';
 
 const AuthContext = createContext(null);
 
@@ -14,6 +14,22 @@ export function AuthProvider({ children }) {
         const onExpired = () => setUser(null);
         window.addEventListener(UNAUTHORIZED_EVENT, onExpired);
         return () => window.removeEventListener(UNAUTHORIZED_EVENT, onExpired);
+    }, []);
+
+    // A shared login changed in another tab. Reload to discard all learner state,
+    // including pending exercises and the previous account's chat in this tab.
+    useEffect(() => {
+        const onStorage = (event) => {
+            if (event.storageArea !== localStorage || (event.key !== null && event.key !== SESSION_KEY) || event.oldValue === event.newValue) return;
+            try {
+                sessionStorage.removeItem(SESSION_KEY);
+                sessionStorage.removeItem(CHAT_KEY);
+            } finally {
+                window.location.reload();
+            }
+        };
+        window.addEventListener('storage', onStorage);
+        return () => window.removeEventListener('storage', onStorage);
     }, []);
 
     const adopt = useCallback((u) => {

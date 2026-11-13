@@ -280,7 +280,7 @@ function CardsTab() {
                     Mẹo: bấm “Lưu vào sổ tay” trong bài học để tạo bộ thẻ riêng của bạn.
                 </p>
             )}
-            <Flashcards key={source} cards={deck} onMark={(c, known) => c.savedId && notebook.markCard(c.savedId, known).catch(() => {})} />
+            <Flashcards key={source} cards={deck} onMark={(c, known) => c.savedId ? notebook.markCard(c.savedId, known) : undefined} />
         </>
     );
 }

@@ -4,6 +4,7 @@
  */
 import { prisma } from '../../lib/prisma.js';
 import { dayKey, ms } from '../../lib/time.js';
+import { CONTENT_VERSION } from './session.js';
 
 export const toAttempt = (a) => ({
     id: a.id,
@@ -34,14 +35,15 @@ export const toCard = (c) => ({
 export const toSession = (s) => ({
     lessonId: s.lessonId,
     step: s.step,
-    answers: s.answers ?? {},
+    answers: Object.fromEntries(Object.entries(s.answers ?? {}).filter(([key]) => key !== CONTENT_VERSION)),
+    contentVersion: s.answers?.[CONTENT_VERSION],
     shadow: s.shadow ?? {},
     startedAt: ms(s.startedAt),
     updatedAt: ms(s.updatedAt),
 });
 
 export async function loadState(userId, db = prisma) {
-    const [user, progress, sessions, attempts, cards, notes, daily] = await Promise.all([
+    const [user, progress, sessions, attempts, cards, notes, daily, perfect] = await Promise.all([
         db.user.findUniqueOrThrow({ where: { id: userId } }),
         db.lessonProgress.findMany({ where: { userId } }),
         db.lessonSession.findMany({ where: { userId } }),
@@ -49,6 +51,7 @@ export async function loadState(userId, db = prisma) {
         db.reviewCard.findMany({ where: { userId } }),
         db.notebookEntry.findMany({ where: { userId } }),
         db.dailyActivity.findMany({ where: { userId } }),
+        db.attempt.findFirst({ where: { userId, score: 100 }, select: { id: true } }),
     ]);
     return {
         user,
@@ -62,6 +65,7 @@ export async function loadState(userId, db = prisma) {
         lessons: Object.fromEntries(progress.map((p) => [p.lessonId, { best: p.best, passed: p.passed, attempts: p.attempts, lastAt: ms(p.lastAt) }])),
         sessions: Object.fromEntries(sessions.map((s) => [s.lessonId, toSession(s)])),
         attempts: attempts.map(toAttempt),
+        hasPerfectAttempt: !!perfect,
         review: Object.fromEntries(cards.map((c) => [c.itemId, toCard(c)])),
         notebook: Object.fromEntries(
             notes.map((n) => [
@@ -74,8 +78,7 @@ export async function loadState(userId, db = prisma) {
 }
 
 /** +answered / +correct for today. */
-export function bumpDaily(db, userId, { answered = 0, correct = 0 }) {
-    const day = dayKey();
+export function bumpDaily(db, userId, { answered = 0, correct = 0, day = dayKey() }) {
     return db.dailyActivity.upsert({
         where: { userId_day: { userId, day } },
         update: { answered: { increment: answered }, correct: { increment: correct } },

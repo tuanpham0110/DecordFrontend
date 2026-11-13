@@ -14,6 +14,7 @@ const password = z
     .regex(/\d/, 'Mật khẩu cần có chữ số.');
 const name = z.string({ error: 'Vui lòng nhập họ và tên.' }).trim().min(2, 'Họ và tên quá ngắn.').max(80, 'Họ và tên quá dài.');
 const purpose = z.enum(['verify', 'reset']);
+const verificationToken = z.string().min(1).max(4096).optional();
 
 const schemas = {
     register: z.object({ name, email, password }),
@@ -21,8 +22,8 @@ const schemas = {
     google: z.object({ credential: z.string().min(20).max(4096) }),
     microsoft: z.object({ idToken: z.string().min(20).max(8192) }),
     forgot: z.object({ email }),
-    resend: z.object({ email, purpose }),
-    verify: z.object({ email, purpose, code: z.string().regex(/^\d{6}$/, 'Vui lòng nhập đủ 6 chữ số.') }),
+    resend: z.object({ email, purpose, verificationToken }),
+    verify: z.object({ email, purpose, verificationToken, code: z.string().regex(/^\d{6}$/, 'Vui lòng nhập đủ 6 chữ số.') }),
     reset: z.object({ resetToken: z.string().min(1), password }),
     profile: z.object({ name }),
     changePassword: z.object({ currentPassword: z.string().max(128).optional(), newPassword: password }),

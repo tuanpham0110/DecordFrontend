@@ -22,6 +22,8 @@ import {
 } from './rules.js';
 import { addToReview, bumpDaily, loadState, toSession } from './state.js';
 import { supportService } from '../support/support.service.js';
+import { learnerTransaction } from './transaction.js';
+import { CONTENT_VERSION, assertSessionContent, contentVersion, reconcileAnswers, reconcileShadow, storedAnswers } from './session.js';
 
 const PART_COUNTER = {
     listen: { correct: 'listenCorrect', total: 'listenTotal' },
@@ -33,18 +35,21 @@ export const learningService = {
         const [C, data, supportUnread] = await Promise.all([getContent(), loadState(userId), supportService.unread(userId)]);
         const stages = decorateStages(C, data);
         const lessons = stages.flatMap((s) => s.lessons.map((l) => ({ ...l, stage: s })));
-        const total = lessons.length;
+        const total = lessons.filter((l) => l.published).length;
         const completed = lessons.filter((l) => l.status === 'done').length;
         const currentL = lessons.find((l) => l.status === 'current');
 
         // most recently touched in-progress session
-        const s0 = Object.values(data.sessions).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+        const openIds = new Set(lessons.filter((l) => l.status === 'current' || l.status === 'done').map((l) => l.id));
+        const s0 = Object.values(data.sessions).filter((s) => openIds.has(s.lessonId)).sort((a, b) => b.updatedAt - a.updatedAt)[0];
         let resume = null;
         if (s0) {
             const { lesson, stage } = findLesson(C, s0.lessonId);
             const ids = lessonItemIds(lesson);
-            if (ids.length) {
-                const done = ids.filter((id) => s0.answers[id] || s0.shadow[id]).length;
+            if (ids.length && ids.every((id) => C.ITEMS[id])) {
+                const answers = reconcileAnswers(C, lesson, s0.answers);
+                const shadow = reconcileShadow(C, lesson, s0.shadow);
+                const done = ids.filter((id) => answers[id] || shadow[id]).length;
                 resume = {
                     lessonId: lesson.id,
                     title: lesson.title,
@@ -71,6 +76,7 @@ export const learningService = {
         return {
             stages,
             total,
+            plannedTotal: lessons.length,
             completed,
             percent: total ? Math.round((completed / total) * 100) : 0,
             published: lessons.filter((l) => l.published).length,
@@ -131,49 +137,68 @@ export const learningService = {
     /** Opens (or resumes) a lesson. Enforces the stage gate and the unlock rule. */
     async startLesson(userId, id) {
         const C = await getContent();
-        const data = await loadState(userId);
         const { lesson, stage } = findLesson(C, id);
-        assertStageOpen(C, data, stage.id);
-        const st = statuses(C, data)[lesson.id];
-        if (st === 'soon' || st === 'locked') throw new HttpError(403, lockReason(C, data, lesson.id, st), { code: st });
+        return learnerTransaction(userId, async (tx) => {
+            const data = await loadState(userId, tx);
+            assertStageOpen(C, data, stage.id);
+            const st = statuses(C, data)[lesson.id];
+            if (st === 'soon' || st === 'locked') throw new HttpError(403, lockReason(C, data, lesson.id, st), { code: st });
 
-        const row = await prisma.lessonSession.upsert({
-            where: { userId_lessonId: { userId, lessonId: lesson.id } },
-            update: {},
-            create: { userId, lessonId: lesson.id },
+            const row = await tx.lessonSession.upsert({
+                where: { userId_lessonId: { userId, lessonId: lesson.id } },
+                update: {},
+                create: { userId, lessonId: lesson.id, answers: storedAnswers(C, lesson, {}) },
+            });
+            const contentChanged = !!row.answers?.[CONTENT_VERSION] && row.answers[CONTENT_VERSION] !== contentVersion(C, lesson);
+            const cleanAnswers = reconcileAnswers(C, lesson, row.answers);
+            const cleanShadow = reconcileShadow(C, lesson, row.shadow);
+            // A resume explicitly adopts the current content. Historical attempts remain immutable.
+            row.answers = storedAnswers(C, lesson, cleanAnswers);
+            row.shadow = cleanShadow;
+            row.step = Math.min(row.step, lessonItemIds(lesson).length);
+            await tx.lessonSession.update({
+                where: { userId_lessonId: { userId, lessonId: lesson.id } },
+                data: { answers: row.answers, shadow: row.shadow, step: row.step },
+            });
+            const session = toSession(row);
+            // send back what was already answered so the player can restore feedback
+            const answered = Object.fromEntries(Object.entries(session.answers).map(([itemId, a]) => [itemId, { ...a, ...revealed(C, itemId) }]));
+            return {
+                lesson: { id: lesson.id, title: lesson.title, minutes: lesson.minutes, goals: lesson.goals ?? [] },
+                stage: { id: stage.id, title: stage.title, tone: stage.tone },
+                // seeded by the session: the order of the choices stays put if the learner leaves and resumes
+                parts: PART_ORDER.map((p) => ({ ...C.PARTS[p], items: (lesson.parts?.[p] ?? []).map((iid) => publicItem(C, iid, `${userId}:${session.startedAt}`)) })).filter(
+                    (p) => p.items.length
+                ),
+                session: { step: session.step, answers: answered, shadow: session.shadow },
+                threshold: C.PASS_THRESHOLD,
+                best: data.lessons[lesson.id]?.best ?? null,
+                contentChanged,
+                contentVersion: session.contentVersion,
+            };
         });
-        const session = toSession(row);
-        // send back what was already answered so the player can restore feedback
-        const answered = Object.fromEntries(Object.entries(session.answers).map(([itemId, a]) => [itemId, { ...a, ...revealed(C, itemId) }]));
-        return {
-            lesson: { id: lesson.id, title: lesson.title, minutes: lesson.minutes, goals: lesson.goals ?? [] },
-            stage: { id: stage.id, title: stage.title, tone: stage.tone },
-            // seeded by the session: the order of the choices stays put if the learner leaves and resumes
-            parts: PART_ORDER.map((p) => ({ ...C.PARTS[p], items: (lesson.parts?.[p] ?? []).map((iid) => publicItem(C, iid, `${userId}:${session.startedAt}`)) })).filter(
-                (p) => p.items.length
-            ),
-            session: { step: session.step, answers: answered, shadow: session.shadow },
-            threshold: C.PASS_THRESHOLD,
-            best: data.lessons[lesson.id]?.best ?? null,
-        };
     },
 
     async saveStep(userId, lessonId, step) {
-        const r = await prisma.lessonSession.updateMany({ where: { userId, lessonId: Number(lessonId) }, data: { step, updatedAt: new Date() } });
-        if (!r.count) throw conflict('Phiên học đã kết thúc.');
-        return true;
+        return learnerTransaction(userId, async (tx) => {
+            const r = await tx.lessonSession.updateMany({ where: { userId, lessonId: Number(lessonId) }, data: { step, updatedAt: new Date() } });
+            if (!r.count) throw conflict('Phiên học đã kết thúc.');
+            return true;
+        });
     },
 
-    async answer(userId, lessonId, itemId, response) {
+    async answer(userId, lessonId, itemId, response, expectedVersion) {
         const C = await getContent();
         const { lesson } = findLesson(C, lessonId);
         const item = C.ITEMS[itemId];
         if (!item || !lessonItemIds(lesson).includes(itemId) || !isGradable(item)) throw badRequest('Câu hỏi không thuộc bài học này.');
 
-        return prisma.$transaction(async (tx) => {
+        return learnerTransaction(userId, async (tx) => {
             const s = await tx.lessonSession.findUnique({ where: { userId_lessonId: { userId, lessonId: lesson.id } } });
             if (!s) throw conflict('Phiên học đã kết thúc. Hãy mở lại bài học.');
-            const answers = { ...(s.answers ?? {}) };
+            if (!lesson.published) throw new HttpError(403, 'Bài học đang được biên soạn.', { code: 'soon' });
+            assertSessionContent(C, lesson, s.answers, expectedVersion);
+            const answers = reconcileAnswers(C, lesson, s.answers);
             const correct = gradeResponse(item, response);
             const prev = answers[itemId];
             if (!prev) {
@@ -185,41 +210,58 @@ export const learningService = {
             } else {
                 answers[itemId] = { ...prev, response, attempts: prev.attempts + 1, retryCorrect: correct };
             }
-            await tx.lessonSession.update({ where: { userId_lessonId: { userId, lessonId: lesson.id } }, data: { answers, updatedAt: new Date() } });
+            await tx.lessonSession.update({ where: { userId_lessonId: { userId, lessonId: lesson.id } }, data: { answers: storedAnswers(C, lesson, answers), updatedAt: new Date() } });
             return { correct, firstTry: !prev, ...revealed(C, itemId) };
         });
     },
 
-    async rateShadow(userId, lessonId, itemId, rating) {
+    async rateShadow(userId, lessonId, itemId, rating, expectedVersion) {
         const C = await getContent();
         const { lesson } = findLesson(C, lessonId);
         if (!lessonItemIds(lesson).includes(itemId) || C.ITEMS[itemId]?.part !== 'shadow') throw badRequest('Câu luyện nói không thuộc bài học này.');
 
-        return prisma.$transaction(async (tx) => {
+        return learnerTransaction(userId, async (tx) => {
             const s = await tx.lessonSession.findUnique({ where: { userId_lessonId: { userId, lessonId: lesson.id } } });
             if (!s) throw conflict('Phiên học đã kết thúc. Hãy mở lại bài học.');
-            const shadow = { ...(s.shadow ?? {}) };
-            const first = !shadow[itemId];
-            shadow[itemId] = { rating, at: Date.now() };
-            if (first) {
-                const practiced = rating !== 'skip';
-                await tx.user.update({ where: { id: userId }, data: { shadowTotal: { increment: 1 }, ...(practiced ? { shadowPracticed: { increment: 1 } } : {}) } });
-                if (practiced) await bumpDaily(tx, userId, { answered: 1, correct: rating === 'again' ? 0 : 1 });
-            }
-            if (rating === 'again') await addToReview(tx, userId, { itemId, part: 'shadow', lessonId: lesson.id });
-            await tx.lessonSession.update({ where: { userId_lessonId: { userId, lessonId: lesson.id } }, data: { shadow, updatedAt: new Date() } });
+            if (!lesson.published) throw new HttpError(403, 'Bài học đang được biên soạn.', { code: 'soon' });
+            assertSessionContent(C, lesson, s.answers, expectedVersion);
+            const shadow = reconcileShadow(C, lesson, s.shadow);
+            const prev = shadow[itemId];
+            const practiced = rating !== 'skip';
+            const wasPracticed = !!prev && prev.rating !== 'skip';
+            const now = Date.now();
+            const day = dayKey(new Date(now));
+            // Keep daily deltas on the day of the original practice, even after midnight.
+            const activityDay = prev?.activityDay || (wasPracticed ? dayKey(new Date(prev.at)) : day);
+            shadow[itemId] = { rating, at: now, ...(practiced || wasPracticed ? { activityDay } : {}) };
+            await tx.user.update({ where: { id: userId }, data: {
+                ...(!prev ? { shadowTotal: { increment: 1 } } : {}),
+                shadowPracticed: { increment: Number(practiced) - Number(wasPracticed) },
+            } });
+            const wasCorrect = wasPracticed && prev.rating !== 'again';
+            const correct = practiced && rating !== 'again';
+            const answeredDelta = Number(practiced) - Number(wasPracticed);
+            const correctDelta = Number(correct) - Number(wasCorrect);
+            if (answeredDelta || correctDelta) await bumpDaily(tx, userId, { answered: answeredDelta, correct: correctDelta, day: activityDay });
+            if (rating === 'again' && prev?.rating !== 'again') await addToReview(tx, userId, { itemId, part: 'shadow', lessonId: lesson.id });
+            await tx.lessonSession.update({ where: { userId_lessonId: { userId, lessonId: lesson.id } }, data: { shadow, answers: storedAnswers(C, lesson, reconcileAnswers(C, lesson, s.answers)), updatedAt: new Date() } });
             return { rating };
         });
     },
 
-    async finishLesson(userId, lessonId) {
+    async finishLesson(userId, lessonId, expectedVersion) {
         const C = await getContent();
         const { lesson, stage } = findLesson(C, lessonId);
 
-        return prisma.$transaction(async (tx) => {
+        return learnerTransaction(userId, async (tx) => {
             const data = await loadState(userId, tx);
             const s = data.sessions[lesson.id];
             if (!s) throw conflict('Không tìm thấy phiên học để chấm điểm.');
+            assertStageOpen(C, data, stage.id);
+            if (!lesson.published) throw new HttpError(403, 'Bài học đang được biên soạn.', { code: 'soon' });
+            assertSessionContent(C, lesson, { [CONTENT_VERSION]: s.contentVersion }, expectedVersion);
+            s.answers = reconcileAnswers(C, lesson, s.answers);
+            s.shadow = reconcileShadow(C, lesson, s.shadow);
             const before = statuses(C, data);
             const gatesBefore = stageGates(C, data);
             const stageDoneBefore = stageComplete(data, stage);
@@ -302,13 +344,13 @@ export const learningService = {
                 unlocked: unlocked.map((uid) => ({ id: uid, title: findLesson(C, uid).lesson.title })),
                 next: next ? { id: next.id, title: next.title, stageId: next.stageId } : null,
                 stageTransition,
-                review: wrongIds.map((iid) => ({ itemId: iid, part: C.ITEMS[iid].part, label: itemLabel(C, iid) })),
+                review: wrongIds.map((iid) => ({ itemId: iid, part: C.ITEMS[iid].part, label: itemLabel(C, iid, { reveal: true }) })),
             };
         });
     },
 
     async restartLesson(userId, lessonId) {
-        await prisma.lessonSession.deleteMany({ where: { userId, lessonId: Number(lessonId) } });
+        await learnerTransaction(userId, (tx) => tx.lessonSession.deleteMany({ where: { userId, lessonId: Number(lessonId) } }));
         return true;
     },
 

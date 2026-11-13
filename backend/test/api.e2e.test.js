@@ -1,25 +1,50 @@
 /**
- * End-to-end API test against a real database (uses DATABASE_URL from .env).
- *   npm test
- * Creates a throw-away user and deletes it afterwards.
+ * Opt-in database E2E: RUN_DB_TESTS=true and TEST_DATABASE_URL pointing to a dedicated *_test DB.
+ * Without both settings this file skips before importing the application or opening a connection.
  */
 import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { createApp } from '../src/app.js';
-import { prisma } from '../src/lib/prisma.js';
-import { resetGoogleKeyCache, verifyGoogleIdToken } from '../src/lib/google.js';
-import { resetMicrosoftKeyCache, verifyMicrosoftIdToken } from '../src/lib/microsoft.js';
-import { compare } from '../src/modules/speech/speech.routes.js';
-import { publicItem } from '../src/modules/learning/rules.js';
 import { ITEMS } from '../prisma/data/content.js';
+
+function dedicatedTestDatabase(value) {
+    try {
+        const url = new URL(value);
+        return ['postgres:', 'postgresql:'].includes(url.protocol) && /(?:^|[_-])test$/i.test(url.pathname.slice(1));
+    } catch {
+        return false;
+    }
+}
+
+if (process.env.RUN_DB_TESTS !== 'true' || !dedicatedTestDatabase(process.env.TEST_DATABASE_URL)) {
+    test('database E2E requires RUN_DB_TESTS=true and a dedicated TEST_DATABASE_URL ending in _test', { skip: true }, () => {});
+} else {
+process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+process.env.JWT_SECRET = crypto.randomBytes(48).toString('hex');
+// Tests must never send real mail or call a configured AI / identity service.
+for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASS', 'GEMINI_API_KEY', 'SPEECH_API_URL', 'GOOGLE_CLIENT_ID', 'MICROSOFT_CLIENT_ID']) delete process.env[key];
+const { createApp } = await import('../src/app.js');
+const { prisma } = await import('../src/lib/prisma.js');
+const { resetGoogleKeyCache, verifyGoogleIdToken } = await import('../src/lib/google.js');
+const { resetMicrosoftKeyCache, verifyMicrosoftIdToken } = await import('../src/lib/microsoft.js');
+const { compare } = await import('../src/modules/speech/speech.routes.js');
+const { publicItem } = await import('../src/modules/learning/rules.js');
+const { credentialVersion } = await import('../src/lib/jwt.js');
 
 let server;
 let base;
 let token;
-const email = `e2e-${Date.now()}@test.local`;
+const runId = crypto.randomUUID();
+const ownedEmails = new Set();
+const fixtureEmail = (label) => {
+    const address = `${label}-${runId}@test.local`;
+    ownedEmails.add(address);
+    return address;
+};
+const email = fixtureEmail('e2e');
 const password = 'Test1234';
 
 async function api(method, path, body, auth = true) {
@@ -39,10 +64,10 @@ before(async () => {
 });
 
 after(async () => {
-    await prisma.user.deleteMany({ where: { email: { endsWith: '@test.local' } } });
-    await prisma.otpCode.deleteMany({ where: { email: { endsWith: '@test.local' } } });
+    await prisma.user.deleteMany({ where: { email: { in: [...ownedEmails] } } });
+    await prisma.otpCode.deleteMany({ where: { email: { in: [...ownedEmails] } } });
     await prisma.$disconnect();
-    server.close();
+    server?.close();
 });
 
 describe('auth', () => {
@@ -56,12 +81,12 @@ describe('auth', () => {
         assert.equal(r.data.field, 'email');
     });
     test('register → login says unverified → wrong OTP rejected', async () => {
-        const e = `new-${Date.now()}@test.local`;
+        const e = fixtureEmail('new');
         assert.equal((await api('POST', '/auth/register', { name: 'New User', email: e, password: 'Abcd1234' })).status, 201);
         const login = await api('POST', '/auth/login', { email: e, password: 'Abcd1234' });
         assert.equal(login.status, 403);
         assert.equal(login.data.code, 'unverified');
-        const v = await api('POST', '/auth/otp/verify', { email: e, purpose: 'verify', code: '000000' });
+        const v = await api('POST', '/auth/otp/verify', { email: e, purpose: 'verify', code: '000000', verificationToken: login.data.verificationToken });
         assert.equal(v.status, 400);
     });
     test('login ok', async () => {
@@ -145,7 +170,9 @@ describe('notebook + review + public', () => {
         assert.equal((await api('GET', '/me/notebook')).data.length, 0);
     });
     test('review answer reschedules the card', async () => {
-        const r = await api('POST', '/me/review/answers', { itemId: 'l1-ep-em', response: 'ếm' });
+        const queue = await api('GET', '/me/review/queue?scope=all');
+        const card = queue.data.find((c) => c.itemId === 'l1-ep-em');
+        const r = await api('POST', '/me/review/answers', { itemId: card.itemId, response: 'ếm', reviewToken: card.reviewToken });
         assert.equal(r.data.correct, true);
         assert.equal(r.data.box, 2);
     });
@@ -162,7 +189,7 @@ describe('notebook + review + public', () => {
 });
 
 describe('account', () => {
-    const e = `acc-${Date.now()}@test.local`;
+    const e = fixtureEmail('acc');
     let t1;
     const as = (tok) => async (method, path, body) => {
         const res = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
@@ -171,15 +198,16 @@ describe('account', () => {
     /** Plants a known OTP the same way the service hashes it. */
     async function plantOtp(email, purpose, code) {
         await prisma.otpCode.updateMany({ where: { email, purpose, consumedAt: null }, data: { consumedAt: new Date() } });
-        const codeHash = crypto.createHmac('sha256', process.env.JWT_SECRET).update(`${email}|${purpose}|${code}`).digest('hex');
+        const user = await prisma.user.findUniqueOrThrow({ where: { email } });
+        const codeHash = crypto.createHmac('sha256', process.env.JWT_SECRET).update(JSON.stringify([email, purpose, code, credentialVersion(user)])).digest('hex');
         await prisma.otpCode.create({ data: { email, purpose, codeHash, expiresAt: new Date(Date.now() + 60_000) } });
     }
-    const pause = () => new Promise((r) => setTimeout(r, 1100)); // JWT iat has second precision
 
     test('confirming the OTP signs the learner in', async () => {
-        assert.equal((await api('POST', '/auth/register', { name: 'Tài Khoản', email: e, password: 'Abcd1234' }, false)).status, 201);
+        const registration = await api('POST', '/auth/register', { name: 'Tài Khoản', email: e, password: 'Abcd1234' }, false);
+        assert.equal(registration.status, 201);
         await plantOtp(e, 'verify', '123456');
-        const v = await api('POST', '/auth/otp/verify', { email: e, purpose: 'verify', code: '123456' }, false);
+        const v = await api('POST', '/auth/otp/verify', { email: e, purpose: 'verify', code: '123456', verificationToken: registration.data.verificationToken }, false);
         assert.equal(v.status, 200);
         assert.ok(v.data.token);
         assert.equal(v.data.user.email, e);
@@ -204,7 +232,6 @@ describe('account', () => {
     test('changing the password needs the current one and signs out older sessions', async () => {
         assert.equal((await as(t1)('POST', '/auth/password/change', { currentPassword: 'wrong', newPassword: 'Newpass123' })).data.code, 'bad-password');
         assert.equal((await as(t1)('POST', '/auth/password/change', { currentPassword: 'Abcd1234', newPassword: 'Abcd1234' })).data.code, 'same-password');
-        await pause();
         const r = await as(t1)('POST', '/auth/password/change', { currentPassword: 'Abcd1234', newPassword: 'Newpass123' });
         assert.equal(r.status, 200);
         assert.equal((await as(t1)('GET', '/auth/me')).status, 401, 'old token is rejected');
@@ -218,7 +245,6 @@ describe('account', () => {
         await plantOtp(e, 'reset', '654321');
         const v = await api('POST', '/auth/otp/verify', { email: e, purpose: 'reset', code: '654321' }, false);
         assert.ok(v.data.resetToken);
-        await pause();
         assert.equal((await api('POST', '/auth/password/reset', { resetToken: v.data.resetToken, password: 'Reset1234' }, false)).status, 200);
         assert.equal((await api('POST', '/auth/password/reset', { resetToken: v.data.resetToken, password: 'Again1234' }, false)).data.code, 'reset-expired');
         assert.equal((await as(t1)('GET', '/auth/me')).status, 401, 'sessions opened before the reset are closed');
@@ -241,8 +267,8 @@ describe('account', () => {
 });
 
 describe('admin + support inbox', () => {
-    const adminEmail = `admin-${Date.now()}@test.local`;
-    const victimEmail = `victim-${Date.now()}@test.local`;
+    const adminEmail = fixtureEmail('admin');
+    const victimEmail = fixtureEmail('victim');
     let adminToken;
     let learnerId;
     const call = (tok) => async (method, path, body) => {
@@ -428,3 +454,4 @@ describe('pronunciation scoring (transcript vs model sentence)', () => {
         assert.ok(compare('mốch, hal, pa, pổn', 'xin chào tất cả mọi người').score < 50);
     });
 });
+}

@@ -5,8 +5,10 @@ import Icon from '../components/Icon.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { NAV_ITEMS } from './nav.js';
 import { CONTACT_EMAIL } from '../data/contact.js';
+import useMeta from '../hooks/useMeta.js';
 
 export default function PublicLayout() {
+    const contactEmail = useMeta()?.supportEmail || CONTACT_EMAIL;
     const { user } = useAuth();
     const [open, setOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
@@ -93,7 +95,7 @@ export default function PublicLayout() {
                 <div className="container site-footer__bottom">
                     <span>
                         © {new Date().getFullYear()} MUONGLAB · <Link to="/dieu-khoan">Điều khoản</Link> · <Link to="/bao-mat">Bảo mật</Link> ·{' '}
-                        <a href={`mailto:${CONTACT_EMAIL}`}>Liên hệ: {CONTACT_EMAIL}</a>
+                        <a href={`mailto:${contactEmail}`}>Liên hệ: {contactEmail}</a>
                     </span>
                     <span>Nội dung tiếng Mường được đội ngũ chuyên môn biên soạn và kiểm chứng trước khi đăng.</span>
                 </div>

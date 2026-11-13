@@ -5,6 +5,7 @@ import Icon from '../components/Icon.jsx';
 import { learning } from '../services/api.js';
 import useAsync from '../hooks/useAsync.js';
 import { useToast } from '../context/ToastContext.jsx';
+import { resumeLabel } from '../utils/learning.js';
 
 const ACTION = {
     done: 'Ôn lại',
@@ -98,7 +99,7 @@ export default function Lessons() {
                                     {!s.unlocked
                                         ? `Mở khi xong 100% chặng ${s.prevId}`
                                         : s.status === 'soon'
-                                          ? `${s.total} bài · đang biên soạn`
+                                          ? `${s.plannedTotal ?? s.total} bài · đang biên soạn`
                                           : `${s.completed}/${s.total} bài hoàn thành`}
                                 </span>
                                 {s.unlocked ? (
@@ -120,7 +121,7 @@ export default function Lessons() {
                         <Icon name="play" size={18} />
                     </span>
                     <span className="resume-strip__text">
-                        <small>{data.resume ? `Đang dừng ở câu ${data.resume.done + 1}/${data.resume.total} · ${data.resume.part}` : 'Bài tiếp theo'}</small>
+                        <small>{data.resume ? resumeLabel(data.resume) : 'Bài tiếp theo'}</small>
                         <strong>
                             Bài {data.resume ? data.resume.lessonId : data.current.lesson.id}: {data.resume ? data.resume.title : data.current.lesson.title}
                         </strong>

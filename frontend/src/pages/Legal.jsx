@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui.jsx';
 import { CONTACT_EMAIL } from '../data/contact.js';
+import useMeta from '../hooks/useMeta.js';
 
 const UPDATED = '14/11/2026';
 
@@ -28,6 +29,7 @@ function LegalPage({ title, lead, children }) {
 }
 
 export function Terms() {
+    const contactEmail = useMeta()?.supportEmail || CONTACT_EMAIL;
     return (
         <LegalPage title="Điều khoản sử dụng" lead="Những quy định khi bạn dùng MUONGLAB – nền tảng học và tra cứu tiếng Mường dành cho đội ngũ công chức trẻ.">
             <h3>1. Dịch vụ</h3>
@@ -77,8 +79,8 @@ export function Terms() {
             <h3>8. Liên hệ</h3>
             <p>
                 Mọi thắc mắc về dịch vụ, xin gửi về{' '}
-                <a href={`mailto:${CONTACT_EMAIL}`} className="link">
-                    {CONTACT_EMAIL}
+                <a href={`mailto:${contactEmail}`} className="link">
+                    {contactEmail}
                 </a>{' '}
                 hoặc nhắn cho quản trị viên trong mục Hỗ trợ sau khi đăng nhập.
             </p>
@@ -87,6 +89,7 @@ export function Terms() {
 }
 
 export function Privacy() {
+    const contactEmail = useMeta()?.supportEmail || CONTACT_EMAIL;
     return (
         <LegalPage title="Chính sách bảo mật" lead="MUONGLAB chỉ thu thập những dữ liệu cần để lưu tiến độ học của bạn, và bạn có thể xoá chúng bất cứ lúc nào.">
             <h3>1. Dữ liệu chúng tôi lưu</h3>
@@ -106,7 +109,7 @@ export function Privacy() {
             <h3>2. Ghi âm khi luyện nói</h3>
             <p>
                 Bản ghi âm ở phần Shadowing được giữ trong trình duyệt để bạn nghe lại và tự so sánh. Bản ghi chỉ được gửi lên máy chủ khi bạn chủ động bấm nút chấm
-                phát âm; khi đó nó được chuyển tới mô hình Google Gemini để chép lại những gì nghe được, và không được lưu lại sau khi chấm.
+                phát âm; khi đó nó được chuyển tới dịch vụ chấm đã cấu hình (Google Gemini hoặc dịch vụ phát âm riêng). Máy chủ MUONGLAB không lưu bản ghi sau khi chấm.
             </p>
 
             <h3>3. Bên thứ ba</h3>
@@ -138,8 +141,8 @@ export function Privacy() {
             <h3>7. Liên hệ</h3>
             <p>
                 Nếu có câu hỏi về dữ liệu cá nhân, hãy viết cho quản trị viên MUONGLAB qua{' '}
-                <a href={`mailto:${CONTACT_EMAIL}`} className="link">
-                    {CONTACT_EMAIL}
+                <a href={`mailto:${contactEmail}`} className="link">
+                    {contactEmail}
                 </a>
                 , hoặc nhắn trong mục Hỗ trợ sau khi đăng nhập. Xem thêm <Link to="/dieu-khoan" className="link">Điều khoản sử dụng</Link>.
             </p>

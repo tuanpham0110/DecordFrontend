@@ -11,6 +11,7 @@ import { supportLimiter } from '../../middleware/rateLimit.js';
 const id = z.coerce.number().int().positive();
 const itemId = z.string().min(1).max(100);
 const response = z.union([z.string().max(500), z.array(z.string().max(200)).max(30)]);
+const contentVersion = z.string().max(128).optional();
 
 export const learningRoutes = Router();
 learningRoutes.use(requireAuth);
@@ -42,18 +43,21 @@ learningRoutes.patch(
 learningRoutes.post(
     `${L}/answers`,
     ah(async (req, res) => {
-        const b = parse(z.object({ itemId, response }), req.body);
-        res.json(await svc.answer(req.user.id, parse(id, req.params.id), b.itemId, b.response));
+        const b = parse(z.object({ itemId, response, contentVersion }), req.body);
+        res.json(await svc.answer(req.user.id, parse(id, req.params.id), b.itemId, b.response, b.contentVersion));
     })
 );
 learningRoutes.post(
     `${L}/shadow`,
     ah(async (req, res) => {
-        const b = parse(z.object({ itemId, rating: z.enum(['good', 'ok', 'again', 'skip'], { error: 'Đánh giá không hợp lệ.' }) }), req.body);
-        res.json(await svc.rateShadow(req.user.id, parse(id, req.params.id), b.itemId, b.rating));
+        const b = parse(z.object({ itemId, rating: z.enum(['good', 'ok', 'again', 'skip'], { error: 'Đánh giá không hợp lệ.' }), contentVersion }), req.body);
+        res.json(await svc.rateShadow(req.user.id, parse(id, req.params.id), b.itemId, b.rating, b.contentVersion));
     })
 );
-learningRoutes.post(`${L}/finish`, ah(async (req, res) => res.json(await svc.finishLesson(req.user.id, parse(id, req.params.id)))));
+learningRoutes.post(`${L}/finish`, ah(async (req, res) => {
+    const b = parse(z.object({ contentVersion }), req.body ?? {});
+    res.json(await svc.finishLesson(req.user.id, parse(id, req.params.id), b.contentVersion));
+}));
 
 /* ───── Review (spaced repetition) ───── */
 learningRoutes.get(
@@ -68,8 +72,8 @@ learningRoutes.get('/review', ah(async (req, res) => res.json(await reviewServic
 learningRoutes.post(
     '/review/answers',
     ah(async (req, res) => {
-        const b = parse(z.object({ itemId, response }), req.body);
-        res.json(await reviewService.answer(req.user.id, b.itemId, b.response));
+        const b = parse(z.object({ itemId, response, reviewToken: z.string().max(2048).optional() }), req.body);
+        res.json(await reviewService.answer(req.user.id, b.itemId, b.response, b.reviewToken));
     })
 );
 

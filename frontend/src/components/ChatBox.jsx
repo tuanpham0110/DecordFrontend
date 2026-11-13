@@ -107,7 +107,7 @@ export default function ChatBox() {
     const send = useCallback(
         async (raw, { retry = false } = {}) => {
             const text = (raw ?? '').trim();
-            if (!text || busy) return;
+            if (!text || abortRef.current) return;
             setError(null);
             if (!retry) setInput('');
             // a retry re-asks the question that is already the last message
@@ -121,15 +121,19 @@ export default function ChatBox() {
                     history.filter((m) => m.text !== WELCOME.text),
                     {
                         signal: ctrl.signal,
-                        onToken: (full) => setMessages([...history, { role: 'model', text: full, pending: true }]),
+                        onToken: (full) => {
+                            if (abortRef.current === ctrl && !ctrl.signal.aborted) setMessages([...history, { role: 'model', text: full, pending: true }]);
+                        },
                     }
                 );
+                if (abortRef.current !== ctrl) return;
                 setMessages((list) => list.map((m, i) => (i === list.length - 1 ? { role: 'model', text: m.text } : m)));
             } catch (e) {
+                if (abortRef.current !== ctrl) return;
                 if (e.name === 'AbortError') {
                     setMessages((list) => {
                         const lastMsg = list[list.length - 1];
-                        return lastMsg.text ? list.map((m, i) => (i === list.length - 1 ? { role: 'model', text: m.text } : m)) : list.slice(0, -1);
+                        return lastMsg?.text ? list.map((m, i) => (i === list.length - 1 ? { role: 'model', text: m.text, incomplete: true } : m)) : list.slice(0, -1);
                     });
                 } else {
                     setMessages(history);
@@ -138,8 +142,10 @@ export default function ChatBox() {
                     setError({ message: e.message, retry: retryable ? text : null });
                 }
             } finally {
-                setBusy(false);
-                abortRef.current = null;
+                if (abortRef.current === ctrl) {
+                    setBusy(false);
+                    abortRef.current = null;
+                }
             }
         },
         [busy, messages]
@@ -164,10 +170,17 @@ export default function ChatBox() {
         return () => document.removeEventListener('keydown', esc);
     }, [open]);
 
-    useEffect(() => () => abortRef.current?.abort(), []);
+    useEffect(() => () => {
+        const ctrl = abortRef.current;
+        abortRef.current = null;
+        ctrl?.abort();
+    }, []);
 
     function reset() {
-        abortRef.current?.abort();
+        const ctrl = abortRef.current;
+        abortRef.current = null;
+        ctrl?.abort();
+        setBusy(false);
         setMessages([WELCOME]);
         setError(null);
     }

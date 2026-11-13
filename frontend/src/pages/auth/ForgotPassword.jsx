@@ -13,7 +13,9 @@ export default function ForgotPassword() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     // production servers without SMTP cannot deliver the code
-    const unavailable = useMeta()?.passwordReset === false;
+    const meta = useMeta();
+    const unavailable = meta?.passwordReset === false;
+    const contactEmail = meta?.supportEmail || CONTACT_EMAIL;
 
     async function onSubmit(e) {
         e.preventDefault();
@@ -44,7 +46,7 @@ export default function ForgotPassword() {
             </div>
             <form className="auth-form" onSubmit={onSubmit} noValidate>
                 {unavailable && (
-                    <FormAlert>Máy chủ chưa bật gửi email nên chưa thể đặt lại mật khẩu lúc này. Vui lòng liên hệ quản trị viên qua {CONTACT_EMAIL} để được hỗ trợ.</FormAlert>
+                    <FormAlert>Máy chủ chưa bật gửi email nên chưa thể đặt lại mật khẩu lúc này. Vui lòng liên hệ quản trị viên qua {contactEmail} để được hỗ trợ.</FormAlert>
                 )}
                 <TextField
                     label="Email"

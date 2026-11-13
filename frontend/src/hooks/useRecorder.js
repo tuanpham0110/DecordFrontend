@@ -24,6 +24,7 @@ export default function useRecorder({ maxSeconds = 15 } = {}) {
     const timerRef = useRef(0);
     const rafRef = useRef(0);
     const urlRef = useRef(null);
+    const generationRef = useRef(0);
 
     const release = useCallback(() => {
         clearInterval(timerRef.current);
@@ -53,6 +54,13 @@ export default function useRecorder({ maxSeconds = 15 } = {}) {
             setStatus('unsupported');
             return;
         }
+        const generation = ++generationRef.current;
+        const previous = recRef.current;
+        if (previous && previous.state !== 'inactive') {
+            previous.onstop = null;
+            previous.stop();
+        }
+        release();
         revoke();
         setError('');
         setStatus('requesting');
@@ -60,6 +68,7 @@ export default function useRecorder({ maxSeconds = 15 } = {}) {
         try {
             stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
         } catch (e) {
+            if (generation !== generationRef.current) return;
             const denied = e?.name === 'NotAllowedError' || e?.name === 'SecurityError';
             setStatus(denied ? 'denied' : 'error');
             setError(
@@ -69,6 +78,10 @@ export default function useRecorder({ maxSeconds = 15 } = {}) {
                       ? 'Không tìm thấy micro trên thiết bị.'
                       : 'Không mở được micro. Hãy kiểm tra thiết bị và thử lại.'
             );
+            return;
+        }
+        if (generation !== generationRef.current) {
+            stream.getTracks().forEach((track) => track.stop());
             return;
         }
         streamRef.current = stream;
@@ -95,10 +108,19 @@ export default function useRecorder({ maxSeconds = 15 } = {}) {
         }
 
         const chunks = [];
-        const rec = new MediaRecorder(stream);
+        let rec;
+        try {
+            rec = new MediaRecorder(stream);
+        } catch {
+            release();
+            setStatus('error');
+            setError('Không khởi tạo được bản ghi. Hãy thử lại hoặc dùng trình duyệt khác.');
+            return;
+        }
         recRef.current = rec;
         rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
         rec.onstop = () => {
+            if (generation !== generationRef.current) return;
             release();
             const blob = new Blob(chunks, { type: rec.mimeType || 'audio/webm' });
             if (!blob.size) {
@@ -112,7 +134,15 @@ export default function useRecorder({ maxSeconds = 15 } = {}) {
             setBlob(blob);
             setStatus('recorded');
         };
-        rec.start();
+        try {
+            rec.start();
+        } catch {
+            rec.onstop = null;
+            release();
+            setStatus('error');
+            setError('Không bắt đầu được bản ghi. Hãy thử lại.');
+            return;
+        }
         setElapsed(0);
         setStatus('recording');
         const t0 = Date.now();
@@ -124,16 +154,23 @@ export default function useRecorder({ maxSeconds = 15 } = {}) {
     }, [maxSeconds, release, revoke, stop]);
 
     const reset = useCallback(() => {
-        stop();
+        generationRef.current++;
+        const rec = recRef.current;
+        if (rec && rec.state !== 'inactive') {
+            rec.onstop = null;
+            rec.stop();
+        }
+        release();
         revoke();
         setElapsed(0);
         setError('');
         setStatus(canRecord() ? 'idle' : 'unsupported');
-    }, [revoke, stop]);
+    }, [release, revoke]);
 
     // always free the microphone and blob URL
     useEffect(
         () => () => {
+            generationRef.current++;
             const rec = recRef.current;
             if (rec && rec.state !== 'inactive') {
                 rec.onstop = null;

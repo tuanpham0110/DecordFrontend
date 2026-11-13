@@ -1,10 +1,11 @@
 /** Error with an HTTP status. Shape sent to clients: { message, code?, field? } */
 export class HttpError extends Error {
-    constructor(status, message, { code, field } = {}) {
+    constructor(status, message, { code, field, verificationToken } = {}) {
         super(message);
         this.status = status;
         this.code = code;
         this.field = field;
+        this.verificationToken = verificationToken;
     }
 }
 
