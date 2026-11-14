@@ -4,10 +4,15 @@ import { DAY, dayKey, weekdayOf } from '../../lib/time.js';
 import { PART_ORDER, getContent } from '../content/content.service.js';
 import {
     BADGES,
+    XP,
     allLessons,
     assertStageOpen,
+    dayXp,
     decorateStages,
     findLesson,
+    focusLessons,
+    longestStreakOf,
+    xpOf,
     gradeResponse,
     isGradable,
     itemLabel,
@@ -72,6 +77,21 @@ export const learningService = {
         });
         const scored = Object.values(data.lessons).filter((l) => l.best != null);
         const minutes = Math.round(data.attempts.reduce((n, a) => n + (a.durationSec || 0), 0) / 60);
+        data.stagesDone = C.STAGES.filter((s) => stageComplete(data, s)).length;
+        const graded = data.partStats.listen.total + data.partStats.build.total;
+        const todayKey = dayKey();
+        const focus = focusLessons(C, data, now);
+
+        /* What to do next, in order of learning value – each with the reason shown to the learner. */
+        const plan = [];
+        if (due.length) plan.push({ kind: 'review', count: due.length, reason: `${due.length} câu đến hạn ôn: ôn đúng lúc giúp nhớ lâu hơn học bài mới.` });
+        if (resume) plan.push({ kind: 'resume', lessonId: resume.lessonId, title: resume.title, reason: `Bài đang làm dở (${resume.done}/${resume.total} câu).` });
+        const retry = focus.find((f) => !f.passed && f.best != null && f.lessonId !== resume?.lessonId);
+        if (retry) plan.push({ kind: 'retry', lessonId: retry.lessonId, title: retry.title, reason: `Điểm tốt nhất ${retry.best}%, cần ${C.PASS_THRESHOLD}% để mở bài tiếp theo.` });
+        if (currentL && currentL.id !== resume?.lessonId && currentL.id !== retry?.lessonId) {
+            plan.push({ kind: 'learn', lessonId: currentL.id, title: currentL.title, reason: currentL.attempts ? 'Bài tiếp theo trong lộ trình.' : 'Bài mới tiếp theo trong lộ trình.' });
+        }
+        if (!plan.length) plan.push({ kind: 'practice', reason: 'Bạn đã học hết các bài hiện có. Luyện từ vựng để giữ trí nhớ.' });
 
         return {
             stages,
@@ -90,7 +110,12 @@ export const learningService = {
                 parts: data.partStats,
                 averageScore: scored.length ? Math.round(scored.reduce((n, l) => n + l.best, 0) / scored.length) : null,
                 minutes,
+                longestStreak: longestStreakOf(data),
+                accuracy: graded ? Math.round(((data.partStats.listen.correct + data.partStats.build.correct) / graded) * 100) : null,
+                xp: { total: xpOf(data), today: dayXp(data.daily[todayKey], data.goal), week: week.map((d) => ({ day: d.day, xp: dayXp(d, data.goal) })), rules: XP },
             },
+            focus,
+            plan: plan.slice(0, 3),
             review: {
                 due: due.length,
                 total: cards.filter((c) => !c.mastered).length,

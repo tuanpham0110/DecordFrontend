@@ -213,6 +213,73 @@ export function streakOf(data) {
     return n;
 }
 
+/** Longest run of consecutive active days ever (badges must not disappear when a streak breaks). */
+export function longestStreakOf(data) {
+    const days = Object.keys(data.daily).filter((k) => data.daily[k]?.answered > 0).sort();
+    let best = 0;
+    let run = 0;
+    let prev = null;
+    for (const k of days) {
+        const t = Date.parse(`${k}T00:00:00Z`);
+        run = prev != null && t - prev === DAY ? run + 1 : 1;
+        best = Math.max(best, run);
+        prev = t;
+    }
+    return best;
+}
+
+/* ───────────── XP ─────────────
+ * Derived from records that already exist, so it can be recomputed and audited at any time:
+ *  - 1 XP per correct answer counted that day (first try in lessons, reviews, shadowing),
+ *    capped per day so replaying the same lesson cannot farm points,
+ *  - a bonus for each day the daily goal was reached (judged against the current goal),
+ *  - a one-off bonus per passed lesson (passing it again gives nothing).
+ */
+export const XP = { perCorrect: 1, dailyCap: 50, goalMet: 10, lessonPassed: 20 };
+
+export function dayXp(day, goal) {
+    if (!day) return 0;
+    return Math.min(XP.dailyCap, Math.max(0, day.correct) * XP.perCorrect) + (day.answered >= goal ? XP.goalMet : 0);
+}
+
+export function xpOf(data) {
+    const fromDays = Object.values(data.daily).reduce((n, d) => n + dayXp(d, data.goal), 0);
+    const passed = Object.values(data.lessons).filter((l) => l.passed).length;
+    return fromDays + passed * XP.lessonPassed;
+}
+
+/**
+ * Lessons that need attention: open review cards grouped by lesson, then lessons attempted
+ * without reaching the pass mark. Purely from the learner's own results.
+ */
+export function focusLessons(C, data, now = Date.now()) {
+    const byLesson = new Map();
+    for (const c of Object.values(data.review)) {
+        if (c.mastered || !C.ITEMS[c.itemId]) continue;
+        const f = byLesson.get(c.lessonId) ?? { lessonId: c.lessonId, open: 0, due: 0, wrong: 0 };
+        f.open += 1;
+        f.wrong += c.wrong;
+        if (c.due <= now) f.due += 1;
+        byLesson.set(c.lessonId, f);
+    }
+    for (const [id, p] of Object.entries(data.lessons)) {
+        const lessonId = Number(id);
+        if (p.attempts > 0 && !p.passed && !byLesson.has(lessonId)) byLesson.set(lessonId, { lessonId, open: 0, due: 0, wrong: 0 });
+    }
+    const out = [];
+    for (const f of byLesson.values()) {
+        let found;
+        try {
+            found = findLesson(C, f.lessonId);
+        } catch {
+            continue;
+        }
+        const p = data.lessons[f.lessonId];
+        out.push({ ...f, title: found.lesson.title, best: p?.best ?? null, passed: !!p?.passed });
+    }
+    return out.sort((a, b) => b.wrong - a.wrong || b.open - a.open || (a.best ?? 0) - (b.best ?? 0)).slice(0, 4);
+}
+
 /** A card answered before its due date is being practised early, not recalled after the interval. */
 export const isEarlyReview = (card, now = Date.now()) => !card.mastered && card.due != null && card.due > now;
 
@@ -246,7 +313,10 @@ export function scheduleCard(card, correct, now = Date.now()) {
 export const BADGES = [
     { id: 'khoi-dau', title: 'Khởi đầu', desc: 'Hoàn thành bài học đầu tiên', icon: 'flag', test: (d) => Object.values(d.lessons).some((l) => l.passed) },
     { id: 'tai-thinh', title: 'Tai thính', desc: 'Nghe đúng 10 câu', icon: 'headphones', test: (d) => d.partStats.listen.correct >= 10 },
-    { id: 'kien-tri', title: 'Kiên trì', desc: 'Học 3 ngày liên tiếp', icon: 'flame', test: (d) => streakOf(d) >= 3 },
+    { id: 'kien-tri', title: 'Kiên trì', desc: 'Học 3 ngày liên tiếp', icon: 'flame', test: (d) => longestStreakOf(d) >= 3 },
     { id: 'hoan-hao', title: 'Hoàn hảo', desc: 'Đạt 100% một bài học', icon: 'star', test: (d) => d.hasPerfectAttempt ?? d.attempts.some((a) => a.score === 100) },
     { id: 'cham-on', title: 'Chăm ôn', desc: 'Ôn tập 10 lượt', icon: 'refresh', test: (d) => (d.reviewDone || 0) >= 10 },
+    { id: 'ben-bi', title: 'Bền bỉ', desc: 'Học 7 ngày liên tiếp', icon: 'calendar', test: (d) => longestStreakOf(d) >= 7 },
+    { id: 'tron-chang', title: 'Trọn chặng', desc: 'Hoàn thành 100% một chặng', icon: 'trophy', test: (d) => (d.stagesDone ?? 0) >= 1 },
+    { id: 'sieng-on', title: 'Siêng ôn', desc: 'Ôn tập 50 lượt', icon: 'layers', test: (d) => (d.reviewDone || 0) >= 50 },
 ];

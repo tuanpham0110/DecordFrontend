@@ -1,6 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { answerFeedback, resumeLabel } from '../src/utils/learning.js';
+import { answerFeedback, normalizeAnswer, pickRound, resumeLabel } from '../src/utils/learning.js';
+
+test('typed drill answers ignore case, spacing and final punctuation but keep tone marks', () => {
+    assert.equal(normalizeAnswer('  Mặt   TLĂNG '), normalizeAnswer('mặt tlăng'));
+    assert.equal(normalizeAnswer('Nhà ja chiếm từ con cúi chẵng ?'), normalizeAnswer('Nhà ja chiếm từ con cúi chẵng?'));
+    assert.equal(normalizeAnswer('mốch, hal, pa, pổn'), normalizeAnswer('mốch hal pa pổn'));
+    // decomposed input (some keyboards) equals the precomposed form
+    assert.equal(normalizeAnswer('pổn'.normalize('NFD')), normalizeAnswer('pổn'));
+    assert.notEqual(normalizeAnswer('pon'), normalizeAnswer('pổn'));
+    assert.notEqual(normalizeAnswer('ấm'), normalizeAnswer('ếm'));
+});
+
+test('drill rounds put the most-missed entries first and never repeat an entry', () => {
+    const entries = [{ id: 'a', weak: 0 }, { id: 'b', weak: 3 }, { id: 'c', weak: 1 }, { id: 'd', weak: 0 }];
+    const round = pickRound(entries, 3);
+    assert.deepEqual(round.slice(0, 2).map((e) => e.id), ['b', 'c']);
+    assert.equal(new Set(round.map((e) => e.id)).size, 3);
+    assert.equal(pickRound(entries, 10).length, 4);
+});
 import { hookHarness, nodes, textOf } from './helpers/hooks.js';
 
 const cards = [{ id: 'a', word: 'a', meaning: 'A' }, { id: 'b', word: 'b', meaning: 'B' }];

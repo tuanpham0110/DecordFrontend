@@ -31,6 +31,28 @@ export const notebookService = {
         return rows.filter((r) => cat.has(r.entryId)).map((r) => ({ ...cat.get(r.entryId), ...toEntry(r) }));
     },
 
+    /**
+     * Verified words/sentences for the practice modes, with how much each one needs practice:
+     * `weak` adds the wrong answers on exercises that teach it (review cards still open count double)
+     * and the flashcards the learner marked "Chưa nhớ". No answer key is involved: these are the same
+     * public word lists as the handbook.
+     */
+    async practice(userId) {
+        const [C, cards, notes] = await Promise.all([
+            getContent(),
+            prisma.reviewCard.findMany({ where: { userId }, select: { itemId: true, wrong: true, mastered: true } }),
+            prisma.notebookEntry.findMany({ where: { userId, known: false }, select: { entryId: true } }),
+        ]);
+        const weak = new Map();
+        const bump = (key, n) => weak.set(key, (weak.get(key) ?? 0) + n);
+        for (const c of cards) {
+            const save = C.ITEMS[c.itemId]?.save;
+            if (save) bump(`${save.type}:${save.ref}`, c.wrong + (c.mastered ? 0 : c.wrong));
+        }
+        for (const n of notes) bump(n.entryId, 1);
+        return catalogEntries(C).map((e) => ({ ...e, weak: weak.get(e.id) ?? 0 }));
+    },
+
     async save(userId, { type, ref }) {
         const C = await getContent();
         const entryId = `${type}:${ref}`;

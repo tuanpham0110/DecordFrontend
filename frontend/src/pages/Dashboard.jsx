@@ -153,6 +153,92 @@ function TodayCard({ stats, onGoal }) {
     );
 }
 
+/* ── Numbers at a glance – all computed by the server from the learner's own records ── */
+function ProgressStrip({ stats, data }) {
+    const xp = stats.xp;
+    const tiles = [
+        { icon: 'sparkle', value: xp.total, label: 'XP', sub: `+${xp.today} hôm nay`, tone: 'clay' },
+        { icon: 'flame', value: stats.streak, label: 'ngày liên tiếp', sub: `Dài nhất: ${stats.longestStreak} ngày` },
+        { icon: 'target', value: stats.accuracy == null ? '—' : `${stats.accuracy}%`, label: 'đúng ngay lần đầu', sub: 'Nghe và ghép câu', tone: 'river' },
+        { icon: 'clock', value: stats.minutes, label: 'phút học', sub: `${data.completed}/${data.total} bài hoàn thành` },
+    ];
+    return (
+        <section aria-label="Tổng kết tiến độ">
+            <ul className="hist-stats dash-stats">
+                {tiles.map((t) => (
+                    <li key={t.label}>
+                        <span className={`hist-stats__icon ${t.tone ? `hist-stats__icon--${t.tone}` : ''}`}>
+                            <Icon name={t.icon} size={20} />
+                        </span>
+                        <div>
+                            <strong>{t.value}</strong>
+                            <span>{t.label}</span>
+                            <small>{t.sub}</small>
+                        </div>
+                    </li>
+                ))}
+            </ul>
+            <p className="muted small dash-stats__rule">
+                XP: {xp.rules.perCorrect} XP mỗi câu đúng (tối đa {xp.rules.dailyCap} XP/ngày), +{xp.rules.goalMet} XP khi đạt mục tiêu ngày, +{xp.rules.lessonPassed} XP cho mỗi bài
+                vượt qua lần đầu.
+            </p>
+        </section>
+    );
+}
+
+const PLAN = {
+    review: (p) => ({ icon: 'refresh', title: `Ôn ${p.count} câu đến hạn`, to: '/on-luyen/phien', cta: 'Ôn ngay' }),
+    resume: (p) => ({ icon: 'play', title: `Học tiếp Bài ${p.lessonId}: ${p.title}`, to: `/hoc/${p.lessonId}`, cta: 'Học tiếp' }),
+    retry: (p) => ({ icon: 'target', title: `Làm lại Bài ${p.lessonId}: ${p.title}`, to: `/hoc/${p.lessonId}`, cta: 'Làm lại' }),
+    learn: (p) => ({ icon: 'book', title: `Bài ${p.lessonId}: ${p.title}`, to: `/hoc/${p.lessonId}`, cta: 'Bắt đầu' }),
+    practice: () => ({ icon: 'puzzle', title: 'Luyện từ vựng', to: '/on-luyen?tab=drills', cta: 'Luyện' }),
+};
+
+function PlanCard({ plan, focus }) {
+    return (
+        <section className="panel plan">
+            <div className="panel__head">
+                <h2 className="panel__title">Gợi ý cho hôm nay</h2>
+            </div>
+            <ol className="plan__list panel__body">
+                {plan.map((p, i) => {
+                    const v = PLAN[p.kind](p);
+                    return (
+                        <li key={`${p.kind}-${i}`}>
+                            <span className="plan__num">{i + 1}</span>
+                            <span className="plan__main">
+                                <strong>{v.title}</strong>
+                                <small>{p.reason}</small>
+                            </span>
+                            <Button to={v.to} size="sm" variant={i === 0 ? 'leaf' : 'light'}>
+                                {v.cta}
+                            </Button>
+                        </li>
+                    );
+                })}
+            </ol>
+            {focus.length > 0 && (
+                <div className="plan__focus">
+                    <h3>Bài cần củng cố</h3>
+                    <ul>
+                        {focus.map((f) => (
+                            <li key={f.lessonId}>
+                                <Link to={`/bai-hoc/${f.lessonId}`}>
+                                    Bài {f.lessonId}: {f.title}
+                                </Link>
+                                <small>
+                                    {f.open ? `${f.open} câu đang ôn` : 'Chưa đạt'}
+                                    {f.best != null && ` · tốt nhất ${f.best}%`}
+                                </small>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+        </section>
+    );
+}
+
 export default function Dashboard() {
     const { user } = useAuth();
     const toast = useToast();
@@ -186,6 +272,9 @@ export default function Dashboard() {
                 <ContinueCard data={data} name={name} />
                 <TodayCard stats={stats} onGoal={setGoal} />
             </div>
+
+            {stats.xp && <ProgressStrip stats={stats} data={data} />}
+            {data.plan?.length > 0 && <PlanCard plan={data.plan} focus={data.focus ?? []} />}
 
             <div className="dash__grid">
                 {/* Journey */}

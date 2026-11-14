@@ -1943,3 +1943,354 @@ a.user-menu__item {
         padding-inline: var(--s-4);
     }
 }
+
+/* ───────────── Dashboard: progress strip + plan ───────────── */
+.dash-stats {
+    margin: var(--s-6) 0 var(--s-2);
+}
+.dash-stats__rule {
+    margin: 0 0 var(--s-6);
+}
+.plan {
+    margin-bottom: var(--s-6);
+}
+.plan > .panel__head {
+    margin-bottom: var(--s-3);
+}
+.plan__list {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0 var(--s-6) var(--s-5);
+    list-style: none;
+}
+.plan__list li {
+    display: flex;
+    gap: var(--s-3);
+    align-items: center;
+    padding: var(--s-3) var(--s-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+}
+.plan__num {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--leaf-50);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--forest-700);
+}
+.plan__main {
+    display: grid;
+    flex: 1;
+    min-width: 0;
+}
+.plan__main strong {
+    color: var(--ink);
+}
+.plan__main small {
+    font-size: 13px;
+    color: var(--muted);
+}
+.plan__focus {
+    padding: var(--s-4) var(--s-6) var(--s-5);
+    border-top: 1px solid var(--line);
+}
+.plan__focus h3 {
+    margin: 0 0 var(--s-2);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+}
+.plan__focus ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-2) var(--s-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.plan__focus li {
+    display: grid;
+}
+.plan__focus a {
+    font-weight: 600;
+    color: var(--forest-700);
+}
+.plan__focus small {
+    font-size: 12px;
+    color: var(--muted);
+}
+@media (max-width: 560px) {
+    .plan__list {
+        padding: 0 var(--s-4) var(--s-4);
+    }
+    .plan__list li {
+        flex-wrap: wrap;
+    }
+    .plan__main {
+        flex-basis: calc(100% - 40px);
+    }
+    .plan__list .btn {
+        margin-left: 40px;
+    }
+}
+
+/* ───────────── Word drills ───────────── */
+.chips .chip {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+.drill {
+    display: grid;
+    gap: var(--s-4);
+}
+.drill__hint {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--muted);
+}
+.match {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--s-4);
+}
+.match__col {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.match__tile {
+    width: 100%;
+    min-height: 52px;
+    padding: var(--s-3) var(--s-4);
+    border: 2px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    font: inherit;
+    font-weight: 600;
+    color: var(--ink);
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+}
+.match__tile:hover:not(:disabled) {
+    border-color: var(--leaf-300);
+}
+.match__tile:focus-visible {
+    outline: 3px solid var(--river-500);
+    outline-offset: 2px;
+}
+.match__tile.is-picked {
+    border-color: var(--leaf-500);
+    background: var(--leaf-100);
+}
+.match__tile.is-correct {
+    border-color: var(--leaf-200);
+    background: var(--leaf-50);
+    color: var(--forest-700);
+    cursor: default;
+    opacity: 0.7;
+}
+.match__tile.is-wrong {
+    border-color: var(--danger);
+    background: var(--danger-bg);
+    animation: drill-shake 0.3s;
+}
+@keyframes drill-shake {
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .match__tile.is-wrong {
+        animation: none;
+    }
+}
+.drill__end {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-3);
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--s-4);
+    border-radius: var(--r-md);
+    background: var(--success-bg);
+}
+.drill__end p {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    margin: 0;
+    font-weight: 600;
+    color: var(--success);
+}
+.drill__prompt {
+    display: grid;
+    gap: var(--s-3);
+    justify-items: center;
+    padding: var(--s-6) var(--s-4);
+    border: 1px solid var(--line);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    text-align: center;
+}
+.drill__meaning {
+    font-size: var(--text-xl);
+    color: var(--forest-950);
+}
+.drill__input {
+    width: 100%;
+    min-height: 56px;
+    padding: var(--s-3) var(--s-4);
+    border: 2px solid var(--line-strong);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    font: inherit;
+    font-size: var(--text-md);
+    color: var(--ink);
+}
+.drill__input:focus {
+    border-color: var(--leaf-500);
+    outline: none;
+    box-shadow: 0 0 0 3px var(--leaf-100);
+}
+.drill__input.is-correct {
+    border-color: var(--success);
+    background: var(--success-bg);
+}
+.drill__input.is-wrong {
+    border-color: var(--danger);
+    background: var(--danger-bg);
+}
+.drill__actions {
+    display: flex;
+    gap: var(--s-3);
+    justify-content: flex-end;
+}
+.drill__note {
+    margin: 0;
+}
+.drill--type .feedback {
+    margin: 0;
+}
+
+/* ───────────── AI chat context chip ───────────── */
+.chat__context {
+    display: flex;
+    gap: var(--s-2);
+    align-items: center;
+    margin: 0 var(--s-4);
+    padding: 6px var(--s-2) 6px var(--s-3);
+    border-radius: var(--r-sm);
+    background: var(--leaf-50);
+    font-size: 13px;
+    color: var(--ink-2);
+}
+.chat__context span {
+    flex: 1;
+    min-width: 0;
+}
+.chat__context .chat__icon {
+    width: 26px;
+    height: 26px;
+    color: var(--muted);
+}
+.chat__context .chat__icon:hover {
+    background: var(--leaf-100);
+    color: var(--ink);
+}
+
+/* ───────────── Admin: content quality ───────────── */
+.adm-content {
+    margin-bottom: var(--s-6);
+}
+.adm-table--lessons .adm-table__row {
+    grid-template-columns: minmax(0, 2.4fr) minmax(0, 1fr) 90px 110px 90px;
+}
+.adm-table__row.is-muted {
+    color: var(--subtle);
+}
+.adm-lesson {
+    display: grid;
+    min-width: 0;
+}
+.adm-lesson strong {
+    color: var(--ink);
+}
+.adm-table__row.is-muted .adm-lesson strong {
+    color: var(--muted);
+}
+.adm-lesson small {
+    font-size: 12px;
+    color: var(--muted);
+}
+.adm-warn {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+    font-weight: 700;
+    color: var(--danger);
+}
+.adm-items {
+    display: grid;
+    gap: var(--s-2);
+    margin: 0;
+    padding: 0 var(--s-6) var(--s-5);
+    list-style: none;
+}
+.adm-items li {
+    display: flex;
+    gap: var(--s-4);
+    align-items: center;
+    padding: var(--s-3) 0;
+    border-bottom: 1px solid var(--line);
+}
+.adm-items__rate {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 56px;
+    height: 56px;
+    border-radius: 999px;
+    background: conic-gradient(var(--danger) var(--rate), var(--danger-bg) 0);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    position: relative;
+    isolation: isolate;
+}
+.adm-items__rate::before {
+    position: absolute;
+    inset: 6px;
+    z-index: -1;
+    border-radius: 999px;
+    background: var(--surface);
+    content: '';
+}
+.adm-items__main {
+    display: grid;
+    min-width: 0;
+}
+.adm-items__main strong {
+    color: var(--ink);
+}
+.adm-items__main small {
+    font-size: 12px;
+    color: var(--muted);
+}
+@media (max-width: 860px) {
+    .adm-table--lessons .adm-table__row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+    .adm-table--lessons .adm-table__row > .adm-lesson {
+        grid-column: 1;
+    }
+    .adm-items {
+        padding: 0 var(--s-4) var(--s-4);
+    }
+}

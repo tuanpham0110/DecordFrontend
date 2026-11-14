@@ -19,6 +19,7 @@ import { logger } from '../../lib/logger.js';
 import { requireAuth } from '../../middleware/auth.js';
 import { aiLimiter } from '../../middleware/rateLimit.js';
 import { getContent } from '../content/content.service.js';
+import { refundQuota, takeQuota } from '../ai/quota.js';
 
 const upload = multer({
     storage: multer.memoryStorage(), // recordings are never written to disk
@@ -211,10 +212,14 @@ speechRoutes.post(
         const item = C.ITEMS[itemId];
         if (!item || item.part !== 'shadow') throw badRequest('Câu luyện nói không tồn tại.');
 
-        res.json(
-            env.SPEECH_API_URL
-                ? await callProvider({ file: req.file, referenceText: item.text, itemId, referenceAudio: item.audioUrl })
-                : await assessWithGemini({ file: req.file, referenceText: item.text })
-        );
+        if (env.SPEECH_API_URL) return res.json(await callProvider({ file: req.file, referenceText: item.text, itemId, referenceAudio: item.audioUrl }));
+        // the Gemini check spends the same daily budget as the tutor chat; a failed check is not counted
+        const day = await takeQuota(req.user.id);
+        try {
+            res.json(await assessWithGemini({ file: req.file, referenceText: item.text }));
+        } catch (e) {
+            await refundQuota(req.user.id, day);
+            throw e;
+        }
     })
 );

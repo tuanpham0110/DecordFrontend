@@ -52,7 +52,8 @@ function FillExercise({ item, response, setResponse, result, playerRef }) {
     return (
         <div className="ex ex--fill">
             <div className="frame">
-                {item.audioText && <AudioPlayer ref={playerRef} src={item.audioUrl} text={item.audioText} size="sm" label="Nghe cả câu" />}
+                {/* the full sentence contains the missing word, so it is only played after answering */}
+                {item.audioText && answered && <AudioPlayer ref={playerRef} src={item.audioUrl} text={item.audioText} size="sm" label="Nghe cả câu" />}
                 <p className="frame__sentence">
                     {item.before && <span>{item.before}</span>}
                     <button

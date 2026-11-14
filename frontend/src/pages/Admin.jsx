@@ -12,6 +12,7 @@ import { WEEKDAY, formatWhen } from '../utils/format.js';
 
 const TABS = [
     { key: 'overview', label: 'Tổng quan' },
+    { key: 'content', label: 'Nội dung' },
     { key: 'users', label: 'Người dùng' },
     { key: 'support', label: 'Hỗ trợ' },
 ];
@@ -77,6 +78,95 @@ function Overview({ onOpenSupport }) {
                     ))}
                 </div>
             </section>
+        </>
+    );
+}
+
+/* ───────────── Content quality ───────────── */
+const PART_LABEL = { listen: 'Nghe', build: 'Ghép câu', shadow: 'Nói' };
+
+function ContentStats() {
+    const { data, error, loading, reload } = useAsync(() => admin.content(), []);
+    if (error) return <ErrorState onRetry={reload}>{error.message}</ErrorState>;
+    if (loading && !data) return <Skeleton h={320} r={18} />;
+    const published = data.lessons.filter((l) => l.published);
+    return (
+        <>
+            <section className="panel adm-content">
+                <div className="panel__head">
+                    <h2 className="panel__title">Bài học</h2>
+                    <span className="muted small">
+                        {published.length}/{data.lessons.length} bài đã xuất bản · ngưỡng đạt {data.threshold}%
+                    </span>
+                </div>
+                <div className="adm-table adm-table--lessons" role="table" aria-label="Thống kê bài học">
+                    <div className="adm-table__row adm-table__row--head" role="row">
+                        <span role="columnheader">Bài</span>
+                        <span role="columnheader">Người học</span>
+                        <span role="columnheader">Lượt làm</span>
+                        <span role="columnheader">Tỷ lệ đạt</span>
+                        <span role="columnheader">Điểm TB</span>
+                    </div>
+                    {data.lessons.map((l) => {
+                        const low = l.passRate != null && l.attempts >= 3 && l.passRate < 50;
+                        return (
+                            <div key={l.id} className={`adm-table__row ${l.published ? '' : 'is-muted'}`} role="row">
+                                <span role="cell" className="adm-lesson">
+                                    <strong>
+                                        Bài {l.id}: {l.title}
+                                    </strong>
+                                    <small>
+                                        Chặng {l.stageId} · {l.published ? `${l.items} câu` : 'Đang biên soạn'}
+                                    </small>
+                                </span>
+                                <span role="cell" data-label="Người học">
+                                    {l.learners ? `${l.learnersPassed}/${l.learners} đã qua` : '—'}
+                                </span>
+                                <span role="cell" data-label="Lượt làm">
+                                    {l.attempts || '—'}
+                                </span>
+                                <span role="cell" data-label="Tỷ lệ đạt" className={low ? 'adm-warn' : ''}>
+                                    {l.passRate == null ? '—' : `${l.passRate}%`}
+                                    {low && <Icon name="alert" size={14} aria-label="Tỷ lệ đạt thấp" />}
+                                </span>
+                                <span role="cell" data-label="Điểm TB">
+                                    {l.avgScore == null ? '—' : `${l.avgScore}%`}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
+            <section className="panel adm-content">
+                <div className="panel__head">
+                    <h2 className="panel__title">Câu nhiều người gặp khó</h2>
+                    <span className="muted small">Sai ngay lần đầu, bỏ trống hoặc tự đánh giá “cần luyện thêm”</span>
+                </div>
+                {data.items.length === 0 ? (
+                    <EmptyState title="Chưa có dữ liệu" art="/assets/mascot-cheer.webp">
+                        Khi người học làm sai, câu đó sẽ được thống kê ở đây để bạn xem lại đề bài hoặc phần giải thích.
+                    </EmptyState>
+                ) : (
+                    <ul className="adm-items panel__body">
+                        {data.items.map((it) => (
+                            <li key={it.itemId}>
+                                <span className="adm-items__rate" style={{ '--rate': `${it.rate}%` }}>
+                                    {it.rate}%
+                                </span>
+                                <span className="adm-items__main">
+                                    <strong lang="mtq">{it.label}</strong>
+                                    <small>
+                                        {PART_LABEL[it.part]} · Bài {it.lessons.join(', ')} · {it.struggled}/{it.learners} người gặp khó · sai tổng {it.wrong} lần · mã {it.itemId}
+                                    </small>
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+            <p className="muted small">
+                Nội dung bài học hiện được quản lý trong <code>backend/prisma/data/content.js</code> và nạp lại mỗi lần deploy.
+            </p>
         </>
     );
 }
@@ -378,6 +468,7 @@ export default function Admin() {
                 </div>
             </header>
             {tab === 'overview' && <Overview onOpenSupport={() => go('support')} />}
+            {tab === 'content' && <ContentStats />}
             {tab === 'users' && <Users onMessage={(id) => go('support', { user: id })} />}
             {tab === 'support' && <Inbox openId={params.get('user')} onOpen={(id) => go('support', id ? { user: id } : {})} />}
         </div>

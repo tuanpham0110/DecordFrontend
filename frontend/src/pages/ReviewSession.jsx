@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, EmptyState, ErrorState, Skeleton } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
 import ExerciseStage from '../components/learn/ExerciseStage.jsx';
+import ChatBox, { openChat } from '../components/ChatBox.jsx';
 import { notebook, review } from '../services/api.js';
 import useAsync from '../hooks/useAsync.js';
 import { useToast } from '../context/ToastContext.jsx';
@@ -32,6 +33,7 @@ export default function ReviewSession() {
                     {children}
                 </main>
             </div>
+            <ChatBox floating={false} />
         </div>
     );
 
@@ -123,6 +125,13 @@ export default function ReviewSession() {
                             await notebook.save(entry);
                             toast('Đã lưu vào sổ tay');
                         }}
+                        onAsk={({ correct }) =>
+                            openChat(
+                                card.part === 'shadow' ? 'Mình cần lưu ý gì khi nói câu này?' : correct ? 'Giải thích thêm cho mình về câu này.' : 'Vì sao câu trả lời của mình chưa đúng?',
+                                { lessonId: card.lessonId, itemId: card.itemId, label: `Câu ôn từ Bài ${card.lessonId}` },
+                                { send: true }
+                            )
+                        }
                         onNext={() => setI((x) => x + 1)}
                         nextLabel={i + 1 === data.length ? 'Kết thúc' : 'Câu tiếp'}
                     />

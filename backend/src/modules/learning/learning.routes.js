@@ -79,6 +79,7 @@ learningRoutes.post(
 
 /* ───── Notebook ───── */
 const entryId = z.string().regex(/^(word|sentence):[\w-]+$/, 'Mục không hợp lệ.');
+learningRoutes.get('/practice/words', ah(async (req, res) => res.json(await notebookService.practice(req.user.id))));
 learningRoutes.get('/notebook/catalog', ah(async (req, res) => res.json(await notebookService.catalog(req.user.id))));
 learningRoutes.get('/notebook', ah(async (req, res) => res.json(await notebookService.list(req.user.id))));
 learningRoutes.post(

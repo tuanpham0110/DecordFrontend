@@ -6,9 +6,12 @@ import useMeta from '../hooks/useMeta.js';
 
 export const OPEN_CHAT_EVENT = 'muonglab:open-chat';
 
-/** Opens the AI chat from anywhere (search, buttons…). */
-export function openChat(prompt) {
-    window.dispatchEvent(new CustomEvent(OPEN_CHAT_EVENT, { detail: { prompt } }));
+/**
+ * Opens the AI chat from anywhere (search, buttons…).
+ * `context` = { lessonId?, itemId?, label } ties the next questions to a lesson / exercise; `send` asks right away.
+ */
+export function openChat(prompt, context, { send = false } = {}) {
+    window.dispatchEvent(new CustomEvent(OPEN_CHAT_EVENT, { detail: { prompt, context, send } }));
 }
 
 const SUGGESTIONS = ['“ếm” nghĩa là gì?', 'Đếm từ 1 đến 4 bằng tiếng Mường', 'Làm sao để mở khoá chặng 2?', 'Mẹo luyện Shadowing hiệu quả'];
@@ -85,7 +88,11 @@ function Markdown({ text }) {
     );
 }
 
-export default function ChatBox() {
+/**
+ * @param {{ floating?: boolean }} props  `floating={false}` hides the round "Hỏi AI" button (lesson / review
+ *   screens, where it would cover the sticky answer bar); the chat then opens only through openChat().
+ */
+export default function ChatBox({ floating = true } = {}) {
     const meta = useMeta();
     const aiConfigured = !!meta?.ai;
     const [open, setOpen] = useState(false);
@@ -93,6 +100,9 @@ export default function ChatBox() {
     const [input, setInput] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null); // { message, retry?: string }
+    // what the learner is asking about ({ lessonId?, itemId?, label }) – sent as ids, never as text
+    const [context, setContext] = useState(null);
+    const pendingSend = useRef(null);
     const abortRef = useRef(null);
     const listRef = useRef(null);
     const inputRef = useRef(null);
@@ -121,6 +131,7 @@ export default function ChatBox() {
                     history.filter((m) => m.text !== WELCOME.text),
                     {
                         signal: ctrl.signal,
+                        context,
                         onToken: (full) => {
                             if (abortRef.current === ctrl && !ctrl.signal.aborted) setMessages([...history, { role: 'model', text: full, pending: true }]);
                         },
@@ -148,19 +159,29 @@ export default function ChatBox() {
                 }
             }
         },
-        [busy, messages]
+        [busy, messages, context]
     );
 
     useEffect(() => {
         const onOpen = (e) => {
             setOpen(true);
-            const prompt = e.detail?.prompt;
-            if (prompt) setInput(prompt);
+            const { prompt, context: ctx, send: now } = e.detail ?? {};
+            if (ctx !== undefined) setContext(ctx);
+            if (prompt && now) pendingSend.current = prompt;
+            else if (prompt) setInput(prompt);
             setTimeout(() => inputRef.current?.focus(), 60);
         };
         window.addEventListener(OPEN_CHAT_EVENT, onOpen);
         return () => window.removeEventListener(OPEN_CHAT_EVENT, onOpen);
     }, []);
+
+    // "Hỏi Ếch Mường về câu này" asks once the new context is in place
+    useEffect(() => {
+        if (!pendingSend.current || !aiConfigured || abortRef.current) return;
+        const text = pendingSend.current;
+        pendingSend.current = null;
+        send(text);
+    }, [context, open, aiConfigured, send]);
 
     useEffect(() => {
         if (!open) return;
@@ -183,23 +204,26 @@ export default function ChatBox() {
         setBusy(false);
         setMessages([WELCOME]);
         setError(null);
+        setContext(null);
     }
 
     const onlyWelcome = messages.length === 1;
 
     return (
         <>
-            <button
-                type="button"
-                className={`chat-fab ${open ? 'is-open' : ''}`}
-                onClick={() => setOpen((v) => !v)}
-                aria-expanded={open}
-                aria-controls="ai-chat"
-                aria-label={open ? 'Đóng trợ lý AI' : 'Mở trợ lý AI'}
-            >
-                {open ? <Icon name="x" size={24} /> : <img src="/assets/mascot-point.webp" alt="" />}
-                {!open && <span className="chat-fab__tag">Hỏi AI</span>}
-            </button>
+            {floating && (
+                <button
+                    type="button"
+                    className={`chat-fab ${open ? 'is-open' : ''}`}
+                    onClick={() => setOpen((v) => !v)}
+                    aria-expanded={open}
+                    aria-controls="ai-chat"
+                    aria-label={open ? 'Đóng trợ lý AI' : 'Mở trợ lý AI'}
+                >
+                    {open ? <Icon name="x" size={24} /> : <img src="/assets/mascot-point.webp" alt="" />}
+                    {!open && <span className="chat-fab__tag">Hỏi AI</span>}
+                </button>
+            )}
 
             {open && (
                 <section id="ai-chat" className="chat" role="dialog" aria-label="Trợ lý AI Ếch Mường">
@@ -277,6 +301,17 @@ export default function ChatBox() {
                         )}
                     </div>
 
+                    {context && (
+                        <div className="chat__context">
+                            <Icon name="book" size={14} />
+                            <span>
+                                Đang hỏi về: <strong>{context.label}</strong>
+                            </span>
+                            <button type="button" className="chat__icon" onClick={() => setContext(null)} aria-label="Bỏ ngữ cảnh, hỏi chung">
+                                <Icon name="x" size={14} />
+                            </button>
+                        </div>
+                    )}
                     <form
                         className="chat__form"
                         onSubmit={(e) => {

@@ -4,6 +4,7 @@ import { Button, ErrorState, Ring, Skeleton } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
 import Modal from '../components/Modal.jsx';
 import ExerciseStage from '../components/learn/ExerciseStage.jsx';
+import ChatBox, { openChat } from '../components/ChatBox.jsx';
 import { learning, notebook } from '../services/api.js';
 import { createTrialAdapter } from '../services/trial.js';
 import { useToast } from '../context/ToastContext.jsx';
@@ -551,6 +552,16 @@ export default function LessonPlayer({ trial = false }) {
                                     : null
                             }
                             saved={item.save ? saved.has(`${item.save.type}:${item.save.ref}`) : false}
+                            onAsk={
+                                trial
+                                    ? null
+                                    : ({ correct }) =>
+                                          openChat(
+                                              item.part === 'shadow' ? 'Mình cần lưu ý gì khi nói câu này?' : correct ? 'Giải thích thêm cho mình về câu này.' : 'Vì sao câu trả lời của mình chưa đúng?',
+                                              { lessonId: data.lesson.id, itemId: item.id, label: `Bài ${data.lesson.id} · câu ${step}/${total}` },
+                                              { send: true }
+                                          )
+                            }
                             onNext={next}
                             nextLabel={step >= total ? (finishing ? 'Đang chấm…' : 'Xem kết quả') : 'Tiếp tục'}
                         />
@@ -572,6 +583,8 @@ export default function LessonPlayer({ trial = false }) {
                     )}
                 </main>
             </div>
+
+            {!trial && <ChatBox floating={false} />}
 
             <Modal
                 open={confirmExit}

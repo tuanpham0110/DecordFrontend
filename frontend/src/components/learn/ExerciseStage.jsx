@@ -67,6 +67,7 @@ export default function ExerciseStage({
     allowSkip = true,
     autoPlay = true,
     headline,
+    onAsk,
 }) {
     const [response, setResponse] = useState(() => fromSubmission(item, initial?.response ?? null));
     const [result, setResult] = useState(initial?.result ?? null);
@@ -228,6 +229,11 @@ export default function ExerciseStage({
                     {detail && (
                         <Button variant={showExplain ? 'green' : 'light'} iconLeft="book" onClick={() => setShowExplain((v) => !v)} aria-pressed={showExplain}>
                             {result.explain ? 'Xem giải thích' : 'Xem dịch nghĩa'}
+                        </Button>
+                    )}
+                    {onAsk && (result || rating) && (
+                        <Button variant="ghost" iconLeft="sparkle" onClick={() => onAsk({ correct: isShadow ? rating !== 'again' : result.correct })}>
+                            Hỏi Ếch Mường
                         </Button>
                     )}
                     {isShadow && !rating && allowSkip && (

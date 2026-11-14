@@ -321,6 +321,8 @@ export const learning = {
     finishLesson: (lessonId, contentVersion) => post(`${S(lessonId)}/finish`, { contentVersion }),
     restartLesson: (lessonId) => del(S(lessonId)),
     history: () => get('/me/history'),
+    /** Verified words/sentences with `weak` = how much the learner needs to practise them. */
+    practiceWords: () => get('/me/practice/words'),
     setGoal: (goal) => put('/me/goal', { goal }).then((r) => r.goal),
 
     /** Public, account-free data. */
@@ -365,6 +367,7 @@ export const support = {
 /* ───────────── Admin area (role = admin) ───────────── */
 export const admin = {
     overview: () => get('/admin/overview'),
+    content: () => get('/admin/content'),
     users: ({ q, page } = {}) => {
         const p = new URLSearchParams();
         if (q) p.set('q', q);

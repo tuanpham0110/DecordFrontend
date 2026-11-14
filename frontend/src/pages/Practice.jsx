@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button, EmptyState, ErrorState, Progress, Skeleton } from '../components/ui.jsx';
 import Icon from '../components/Icon.jsx';
 import Flashcards from '../components/learn/Flashcards.jsx';
+import WordDrills, { DRILLS } from '../components/learn/WordDrills.jsx';
 import { learning, notebook, review } from '../services/api.js';
 import useAsync from '../hooks/useAsync.js';
 import { formatDue } from '../utils/format.js';
@@ -286,6 +287,31 @@ function CardsTab() {
     );
 }
 
+function DrillsTab() {
+    const { data, error, loading, reload } = useAsync(() => learning.practiceWords(), []);
+    const [params, setParams] = useSearchParams();
+    const mode = DRILLS.some((d) => d.key === params.get('drill')) ? params.get('drill') : 'match';
+    if (error) return <ErrorState onRetry={reload}>{error.message}</ErrorState>;
+    if (loading) return <Skeleton h={360} r={24} />;
+    const weak = data.filter((e) => e.weak > 0).length;
+    return (
+        <>
+            <div className="chips" role="tablist" aria-label="Dạng luyện tập">
+                {DRILLS.map((d) => (
+                    <button key={d.key} role="tab" aria-selected={mode === d.key} className="chip" title={d.desc} onClick={() => setParams({ tab: 'drills', drill: d.key }, { replace: true })}>
+                        <Icon name={d.icon} size={16} /> {d.label}
+                    </button>
+                ))}
+            </div>
+            <p className="muted small hint-line">
+                {DRILLS.find((d) => d.key === mode).desc}{' '}
+                {weak > 0 ? `${weak} từ/câu bạn hay sai được đưa lên trước.` : 'Luyện thêm ngoài bài học, không tính vào điểm bài.'}
+            </p>
+            <WordDrills key={mode} entries={data} mode={mode} />
+        </>
+    );
+}
+
 function QuizTab() {
     const { data, error, loading, reload } = useAsync(() => learning.vocabulary(), []);
     if (error) return <ErrorState onRetry={reload} />;
@@ -293,7 +319,7 @@ function QuizTab() {
     return <Quiz words={data} />;
 }
 
-const MODES = ['review', 'cards', 'quiz'];
+const MODES = ['review', 'drills', 'cards', 'quiz'];
 
 export default function Practice() {
     const [params, setParams] = useSearchParams();
@@ -304,11 +330,14 @@ export default function Practice() {
             <header className="page-head">
                 <div>
                     <h1>Ôn luyện</h1>
-                    <p>Ôn lại câu từng làm sai theo lịch ngắt quãng, lật thẻ từ vựng và tự kiểm tra nhanh.</p>
+                    <p>Ôn lại câu từng làm sai theo lịch ngắt quãng, luyện ghép – nghe – dịch từ vựng, lật thẻ và tự kiểm tra nhanh.</p>
                 </div>
                 <div className="segmented" role="tablist" aria-label="Chế độ ôn luyện">
                     <button role="tab" aria-selected={mode === 'review'} onClick={() => setMode('review')}>
                         Cần ôn tập
+                    </button>
+                    <button role="tab" aria-selected={mode === 'drills'} onClick={() => setMode('drills')}>
+                        Luyện từ
                     </button>
                     <button role="tab" aria-selected={mode === 'cards'} onClick={() => setMode('cards')}>
                         Thẻ ghi nhớ
@@ -320,6 +349,7 @@ export default function Practice() {
             </header>
             <div className={mode === 'review' ? '' : 'practice'}>
                 {mode === 'review' && <ReviewQueue />}
+                {mode === 'drills' && <DrillsTab />}
                 {mode === 'cards' && <CardsTab />}
                 {mode === 'quiz' && <QuizTab />}
             </div>
